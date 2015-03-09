@@ -104,9 +104,9 @@ checkUnzip(){
 	fi
 }
 
+
 ## make sure unzip is installed
 checkUnzip;
-
 
 ## Check to make sure that this is not a all run 
 ## Meaning that it is upgrading all the mods

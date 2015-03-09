@@ -8,7 +8,105 @@
 ##	This file was re-wrote by Joseph Mills
 ##
 
-. /common
+. common
+
+unzipCommand=$(which unzip)
+unzipInstalled=0
+upgradeArgument="All"
+
+upgradeHelp(){
+cat << EOF
+This script is used to update mango moduels. You can use this script to individual modues or all of them 
+
+By default it updates all of them,
+
+Usage:
+    ./upgrade [moduels]
+    
+Example: 
+    ./upgrade sstTheme
+    
+EOF
+}
+
+
+removeOldJars(){
+	find "$MA_HOME"/lib/ -name "*.jar" -exec rm {} \;
+	rm -Rf "$MA_HOME"/work
+}
+
+removeOldZips()){
+	find "$MA_HOME"/ -name "m2m2-core-*.zip" -exec unzip -o {} \;
+	find "$MA_HOME"/ -name "m2m2-core-*.zip" -exec rm {} \;
+}
+
+changeOwnerShip(){
+	cd "$MA_HOME"/
+	chown -R $USER:$USER bin/
+	cd -
+}
+
+changeBinPermissions(){
+	## all the main bin files
+	find "$MA_HOME"/bin/ -type f -exec chmod 644 {} \; ;
+	find "$MA_HOME"/bin/ -type d -exec chmod 755 {} \; ;
+	cd "$MA_HOME"/bin/
+	for i in common ma mainit ma-restart ma-start ma-stop upgrade;
+	do 
+		chmod u+x $i;
+	done;
+	cd - ;
+
+	##ext-av
+	find "$MA_HOME"/bin/ext-available -type d -exec chmod 755 {} \;
+	find "$MA_HOME"/bin/ext-available -type f -exec chmod 644 {} \;
+	cd "$MA_HOME"/bin/ext-available;
+	for i in debug out;
+	do
+		chmod u+x $i;
+	done;
+	cd - ;
+}
+
+##############################
+## Lets use a file with names and read from that on a while line loop
+## No reason to tie into the wildcards.  This would also make it easy
+## to configure this option, Like adding and removing upgrade scripts 
+## add the functions to the common file :) 
+###############################
+upgradeAllMods(){
+	while read -r line;
+	do
+		"$MA_HOME"/bin/upgrade/$line;
+		rm "$MA_HOME"/bin/upgrade/$line
+	done < $upgradeConfigure;
+	##Make a check to make sure that that rean good 
+	if [ $? != 0 ];
+	then 
+		echo "Gezz Batman something went wrong"
+	else
+		echo "success upgrading mods"
+	fi
+}
+
+
+## check to make sure that unzip is installed
+checkUnzip(){
+	if [ $unzipCommand >= 1 ];
+	then
+	      unzipInstalled=1
+	else
+	      unzipInstalled=0
+	      echo "$now	ERROR Unzip is not installed" >> $logFile;
+	      echo "Unzip does not seem to be installed"
+	      echo "Please install unzip !"
+	      exit 1;      
+	fi
+}
+
+## make sure unzip is installed
+checkUnzip;
+
 
 ## Check to make sure that this is not a all run 
 ## Meaning that it is upgrading all the mods
@@ -32,4 +130,5 @@ else
 	changeBinPermissions;
 	# We use the function because if verbose is still set then ,,,,  
 	startMango;
+	echo  "$now	Starting Mango" >> $logFile;
 fi

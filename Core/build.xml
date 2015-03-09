@@ -120,9 +120,8 @@
         </copy>
 
         <!-- Copy the Scripts into the target -->
-        <property name="scriptsFiles" value="ma,ma-start,ma-stop,ma-restart,common,ma-init,upgrade"/>
 	<!-- run the for loop on this for the scripts --> 
-	<for list="${scriptFiles}" param="scriptName" delimiter=",">
+	<for list="ma,ma-start,ma-stop,ma-restart,common,ma-init,upgrade" param="scriptName" delimiter=",">
         <sequential>
 		<copy todir="${core.target}/bin" preservelastmodified="true">
 			<fileset dir="scripts" includes="**/@{scriptName}" />
@@ -142,7 +141,7 @@
 	
 	
         <!-- Cleanup the Linux scripts -->
-	<for list="${scriptFiles}" param="scriptName" delimiter=",">
+	<for list="ma,ma-start,ma-stop,ma-restart,common,ma-init,upgrade" param="scriptName" delimiter=",">
 	<sequential>
 	  <fixcrlf srcdir="${core.target}/bin"
                  includes="**/@{scriptName}"
@@ -305,7 +304,7 @@
             description="Create zip release of the ${core.target}, in ${core.release} removing source files.">
 
         <!-- Fix the scripts -->
-      	<for list="${scriptFiles}" param="scriptName" delimiter=",">
+      	<for list="ma,ma-start,ma-stop,ma-restart,common,ma-init,upgrade" param="scriptName" delimiter=",">
         <sequential>
         <fixcrlf srcdir="${core.target}/bin"
                  includes="**/@{scriptName}"
@@ -568,7 +567,7 @@
         </copy>
 
 	
-	<for list="${scriptFiles}" param="scriptName" delimiter=",">
+	<for list="ma,ma-start,ma-stop,ma-restart,common,ma-init,upgrade" param="scriptName" delimiter=",">
 		<sequential>
 			<copy todir="${core.target}/bin" preservelastmodified="true">
 				<fileset dir="scripts" includes="**/@{scriptName}" />
@@ -582,7 +581,7 @@
         </copy>
         
 	<!-- CHMOD the Linux scripts -->
-	<for list="${scriptFiles}" param="scriptName" delimiter=",">
+	<for list="ma,ma-start,ma-stop,ma-restart,common,ma-init,upgrade" param="scriptName" delimiter=",">
 		<sequential>
 			<chmod dir="${core.target}/bin" includes="**/@{scriptName}" perm="755" />
 		</sequential>
@@ -675,7 +674,7 @@
     <target name="dev-release"
             description="Zip Contents of Target for Development Release">
       
-      	<for list="${scriptFiles}" param="scriptName" delimiter=",">
+      	<for list="ma,ma-start,ma-stop,ma-restart,common,ma-init,upgrade" param="scriptName" delimiter=",">
 		<sequential>
 			<copy todir="${core.target}/bin" preservelastmodified="true">
 				<fixcrlf srcdir="scripts" includes="**/@{scriptName}" eol="lf" eof="remove" />
@@ -701,7 +700,7 @@
             <zipfileset dir="scripts" includes="**/*.bat" prefix="bin" />
             
 	   
-		<for list="${scriptFiles}" param="scriptName" delimiter=",">
+		<for list="ma,ma-start,ma-stop,ma-restart,common,ma-init,upgrade" param="scriptName" delimiter=",">
 			<sequential>
 				<zipfileset dir="scripts"
 				includes="**/@{scriptName}"

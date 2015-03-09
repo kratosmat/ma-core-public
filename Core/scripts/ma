@@ -8,13 +8,16 @@
 ##
 ##	This file was re-wrote by Joseph Mills
 ##
-. /common
+#set -x 
 
-## Only set MA_HOME if not already set
-## FIXME all caps vars should only be assigned for system vars
-## EXAMPLE:  say you set a var called USER="bob" This will confict 
-## with the system varible $USER whick is used to get back the current
-## user this is real handy for setting ownership and things to groups. 
+
+
+# Only set MA_HOME if not already set
+# FIXME all caps vars should only be assigned for system vars
+# EXAMPLE:  say you set a var called USER="bob" This will confict 
+# with the system varible $USER whick is used to get back the current
+# user this is real handy for setting ownership and things to groups. 
+PRGDIR=$(dirname "$0");
 [ -z "$MA_HOME" ] && MA_HOME=$(cd "$PRGDIR/.." >/dev/null; pwd -P)
 
 if [ ! -r "$MA_HOME"/bin/ma ]; 
@@ -24,14 +27,46 @@ then
 	exit 1;
 fi
 
-## J: no need to export this why not save as a global var ?
 export MA_HOME
+  
+mainHelp() {
+cat <<EOF
+##################################################
+##
+##           Welcome to Mango
+##
+##    SCADA, HMI & Automation Software
+##    Easy, Affordable and Open Source
+##
+##
+##################################################
 
-while [ "$#" -gt 0 ]; 
+Usage:
+    ./ma [argument]
+
+Accepted Arguments
+    
+    start --start)	This will start mango
+    
+    stop --stop)	This is used to try to shut down mango the nice way
+ 
+    restart --restart)		Restart mango
+    
+    verbose --v --verbose)	Run mango verbosely from the command line, 
+    
+    upgrade --upgrade)		Upgrade all your mango moduels See Also upgrade --help
+
+    h help --help)	Show the help page
+EOF
+}
+
+
+while [ $# -gt 0 ]; 
 do
 	case $1 in
 		help|-h|-\?|--help)
 			mainHelp
+			exit
 		;;
 		verbose|-v|--verbose)
 			$verbose=1 ; ## J: set the verbose (in common) to one if it is added so we can use on all files 
@@ -43,17 +78,18 @@ do
 			if [ $verbose >= 1 ];
 			then
 				"$MA_HOME"/bin/ma-start &
+			
 			else
 				"$MA_HOME"/bin/ma-start & 2>&1 /dev/null;
-			if
+			fi
 		;;
-		--restart|restart) # J: because we are adding the verbose option to the mix we can set that in the script because we are adding common with it
+		--restart|restart) # because we are adding the verbose option to the mix we can set that in the script because we are adding common with it
 			source "$MA_HOME"/bin/ma-restart
 		;;
 		stop|--stop)
 			source "$MA_HOME"/bin/ma-stop
 		;;
-		upgrade|--upgrade) ## j: we check the second argument on the 1st if we just want to upgrade a single mod
+		upgrade|--upgrade) ## we check the second argument on the 1st if we just want to upgrade a single mod
 			if [ "$#" -gt 1 ];
 			then
 				upgradeArgument=$2
@@ -73,8 +109,9 @@ do
 		;;
 		*)
 			echo "Usage: ma [ start --start| stop --stop|restart --restart | h --help help -? | verbose --v --verbose | --upgrade upgrade ]"
-			exit 1
+			break
 		;;
 	esac
+	shift
 done
-exit 0
+exit 0;

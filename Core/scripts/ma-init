@@ -10,7 +10,7 @@
 ##	 This file Was re-wrote by Joseph Mills
 ##
 
-. /common
+. common
 
 scriptChecker;
 
@@ -31,7 +31,7 @@ fi
 ##
 if [[ "$(ls -A $MA_HOME/bin/ext-enabled)" ]]; 
 then
-    echo "$now ma-start: running init extensions..." >> $logfile;
+    echo "$now		ma-start: running init extensions..." >> $logfile;
     for f in "$MA_HOME"/bin/ext-enabled/debug "$MA_HOME"/bin/ext-enabled/debug; 
     do
         source $f init;

@@ -7,41 +7,86 @@
 ##
 ##	This file was re-wrote by Joseph Mills
 ##
-. /common
-
+. common
 scriptChecker
 
+allPID=$(ps aux | grep [b]in | grep [m]a-start | awk '{print $2}')  
+pidName=$(ps aux | grep [b]in | grep [m]a-start | awk '{print $12}')
+mangpoPID=$(cat "$MA_HOME"/bin/ma.pid);
+
+startMango(){
+	if [ $verbose >= 1 ];
+	then
+		"$MA_HOME"/bin/ma start &;
+	else
+		"$MA_HOME"/bin/ma-start & 2>&1 /dev/null;
+	fi
+}
+
+
+killPID(){
+	if [[ $allPID != "" ]];
+	then 
+		echo "$now   Looks like there is a mango running here  $pidName" >> $logFile;
+		echo "Found Another mango running "
+		cat $allPID | while read -r line;
+		do
+			echo -n "Found Mango running here $pidName Would you like to stop it [y/n]?"
+			read -n killoption;
+			if [[ $killoption == "y" ]];
+			then 
+				kill $line;
+				if [ $? != 0 ];
+				then 
+					echo "some thing has gone wrong with killing the process $line $pidName"
+				else
+					echo "$now Killed mango running here $pidName with the pid number of $line " >> $logFile; 
+				fi
+			elif [[ $killoption == "n" ]];
+				echo "Ok not going to kill "
+				exit 1;
+			else
+				echo "That is not a vaild option"
+				echo "Please enter y or n"
+			fi
+		done;
+		echo "$pidName "
+	else
+	fi
+}
 # If there is a pid file, use it to kill the Java process.
 if [ -f "$MA_HOME"/bin/ma.pid ];
 then
-	echo "$now   ma-restart: restart initiated..." >> $logFile;
+	echo "$now	ma-restart: restart initiated..." >> $logFile;
 	## echo pleaseRestart > "$MA_HOME"/RESTART  
 	## FIXME what if this is not found ?  
 	## then we should  use ps aux as it is way more realiable
+	echo "pleaseRestart" > "$MA_HOME"/RESTART
 	kill $mangoPID;
 		if [ $? != 0 ];
 		then 
-			echo "$now     Something went wrong with killing the PID of  $mangoPID" >>  $logFile;
+			echo "$now	Something went wrong with killing the PID of  $mangoPID" >>  $logFile;
 		else 
-			echo "$now     Sucess Killed the pid of $mangoPID;" >>  $logFile;
+			echo "$now	Sucess Killed the pid of $mangoPID;" >>  $logFile;
 		fi 
 elif [[ $allPID == ""  ]];
 then
-	echo "$now The Pid Was killed and there is no other mangos running " >> $logfile;
+	echo "$now	The Pid Was killed and there is no other mangos running " >> $logfile;
 else 
-	echo "$now   Seems like there is still a a pid running ps aux says ...... $findPID " >> $logFile;
-	killPID;
+	echo "$now	Seems like there is still a a pid running ps aux says ...... $findPID " >> $logFile;
+	## FIXME If there is a pid file out there then we should let the user kill it. 
+	#killPID;
 	
 else
 	echo "No PID file found. Java process not restarted"
-	echo "$now   ps aux says ...... $findPID " >> $logFile;
+	echo "$now	ps aux says ...... $findPID " >> $logFile;
 fi
 
 ##
 ## FIXME Where is the restart part ?  
 if [ $? != 0 ];
 then
-	echo "$now something went wrong" >> $logFile;
+	echo "$now	something went wrong" >> $logFile;
 else
 	startMango;
 fi

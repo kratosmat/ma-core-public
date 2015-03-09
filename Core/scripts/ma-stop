@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+##
+## 	The stop script for Mango Automation
+##
+##	Copyright (C) 2014 Infinite Automation Systems Inc. All rights reserved.
+##	@author Matthew Lohbihler
+##
+##	This file was re-wrote by Joseph Mills
+##
+
+
+. /common
+
+scriptChecker;
+
+## Run enabled stop extensions.
+if [[ "$(ls -A $MA_HOME/bin/ext-enabled)" ]]; 
+then
+	echo "$now ma-start: running stop extensions..." >> $logFile
+	for f in "$MA_HOME"/bin/ext-enabled/out "$MA_HOME"/bin/ext-enabled/debug ;
+	do
+		source $f stop;
+	done
+fi
+
+## If there is a pid file, use it to kill the Java process.
+if [ -f "$MA_HOME"/bin/ma.pid ]; 
+then
+	echo "$now  ma.stop: stop initiated..." >> $logFile;;
+	## Write a flag to the start script that the app was explicitly stopped.
+	## echo pleaseStop > "$MA_HOME"/STOP;
+	## FIXME should be a better function with ps for this
+	kill $mangoPID;
+		if [ $? != 0 ];
+		then 
+			echo "$now     Something went wrong with killing the PID of  $mangoPID" >>  $logFile;
+		else 
+			echo "$now     Sucess Killed the pid of $mangoPID;" >>  $logFile;
+		fi 
+elif [[ $allPID == ""  ]];
+then
+	## FIXME lets look at what ps aux has to say and present this to the user for killing
+	echo "No PID file found. Java process not stopped";
+	echo "$now  ma.stop: No PID file found. Java process not stopped..." >> $logFile ;
+else 
+	echo "$now   Seems like there is still a a pid running ps aux says ...... $findPID " >> $logFile;
+	killPID;
+fi

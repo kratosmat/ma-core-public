@@ -1,4 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
+##
+## FIXME make default value for help or fail.
+##
 case "$1" in
     init)
         # Starts the Java debugger as a socket at port 8090 without suspending.

@@ -1,4 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
+##
+## FIXME make default value for help or fail.
+##
 case "$1" in
     init)
         # Logs start up message from sysout and syserr to ma.out and ma.err respectively

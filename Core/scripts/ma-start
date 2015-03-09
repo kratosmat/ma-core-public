@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+##
+## The start script for Mango Automation. This contains a loop for the purpose of 
+## restarting MA as required
+##
+##    Copyright (C) 2014 Infinite Automation Systems Inc. All rights reserved.
+##    @author Matthew Lohbihler
+##
+##
+##	 this file has been re-wrote by Joseph Mills
+##
+
+. /common 
+
+scriptChecker;
+
+## This will ensure that the logs are written to the correct directories.
+cd "$MA_HOME"
+
+LOOP_EXIT=false
+while [ $LOOP_EXIT = false ]; 
+do
+	## Check for core upgrade 
+	## J:  why are we checking for rightablity ?
+	if [ -r "$MA_HOME"/m2m2-core-*.zip ];
+	then
+		echo "$now     ma-start: upgrading core..." >> $logFile;
+		"$MA_HOME"/bin/upgrade
+		exit 0
+	fi
+	setJavaClasspathVars;
+
+	## Run enabled start extensions
+	if [ "$(ls -A $MA_HOME/bin/ext-enabled)" ];
+		then
+		echo "$now ma-start: running start extensions..." >> $logFile;
+		for f in $MA_HOME/bin/ext-enabled/debug $MA_HOME/bin/ext-enabled/out;
+		do
+			source $f start
+		done
+	fi
+    
+	## Check for output redirection 
+	## FIXME please read the 1st FIXME tag on the ma file 
+	if [ ! -z $SYSOUT ] && [ ! -z $SYSERR ];
+	then
+		## Both output redirects are set
+		exec >$SYSOUT 2>$SYSERR
+	elif [ ! -z $SYSOUT ]; then
+		## Just sysout is set
+		exec >$SYSOUT
+	elif [ ! -z $SYSERR ]; then
+		## Just syserr is set
+		exec >$SYSERR
+	fi
+    
+	## Make sure there are no explicit stop or termination flag files
+	rm -f "$MA_HOME"/STOP
+	rm -f "$MA_HOME"/TERMINATED
+    
+	echo " $now ma-start: starting MA" >> $logFile;
+	$EXECJAVA $JPDA $JAVAOPTS -server -cp "$MA_CP" \
+	    "-Dma.home=$MA_HOME" \
+	    "-Djava.library.path=$MA_HOME/overrides/lib:$MA_HOME/lib:/usr/lib/jni/:$PATH" \
+	    com.serotonin.m2m2.Main &
+    
+	PID=$!
+	## WHAT WHAT WHAT ? looks like the ps command is not set right
+	## FIXME make this way more clean and more checks
+	echo "$now  ma-start: MA started with PID $PID" >> $logFile;
+	echo "Started Mango with ProcessID: " $PID
+	echo $PID > "$MA_HOME"/bin/ma.pid
+	until !(ps $PID > /dev/null) 
+	do
+		## Check for a termination flag file. If found, kill the process.
+		if [ -r "$MA_HOME"/TERMINATED ];
+		then
+			sleep 1
+			kill -9 $PID
+		else
+			sleep 3
+		fi
+	done
+	
+	rm "$MA_HOME"/bin/ma.pid
+
+	## Run enabled restart extensions
+	if [ "$(ls -A $MA_HOME/bin/ext-enabled)" ];
+	then
+		echo "$now  ma-start: running restart extentions" >> $logFile
+		for f in "$MA_HOME"/bin/ext-enabled/output "$MA_HOME"/bin/ext-enabled/debug;
+		do
+			source $f restart
+		done
+	fi
+    
+	## Check if MA was explicitly stopped by the stop script.
+	if [ -r "$MA_HOME"/STOP ]; then
+		echo "$now ma-start: MA explicitly stopped. Exiting restart loop" >> $logFile;
+		rm "$MA_HOME"/STOP
+		LOOP_EXIT=true
+	fi
+done
+
+echo "$now ma-start: done" >> $logFile;

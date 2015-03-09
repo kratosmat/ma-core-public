@@ -120,19 +120,38 @@
         </copy>
 
         <!-- Copy the Scripts into the target -->
-        <copy todir="${core.target}/bin" preservelastmodified="true">
-            <fileset dir="scripts" includes="**/*.bat" />
-            <fileset dir="scripts" includes="**/*.sh" />
-        	<fileset dir="scripts" includes="**/README" />
+        <property name="scriptsFiles" value="ma,ma-start,ma-stop,ma-restart,common,ma-init,upgrade"/>
+	<!-- run the for loop on this for the scripts --> 
+	<for list="${scriptFiles}" param="scriptName" delimiter=",">
+        <sequential>
+		<copy todir="${core.target}/bin" preservelastmodified="true">
+			<fileset dir="scripts" includes="**/@{scriptName}" />
+		</copy>
+	</sequential>
+	</for>
+	
+	<!-- copy the bat and the README file -->
+	<copy todir="${core.target}/bin" preservelastmodified="true">
+		<fileset dir="scripts" includes="**/*.bat" />
+		<fileset dir="scripts" includes="**/README" />
         </copy>
 
+	
+	
+	
+	
+	
         <!-- Cleanup the Linux scripts -->
-        <fixcrlf srcdir="${core.target}/bin"
-                 includes="**/*.sh"
+	<for list="${scriptFiles}" param="scriptName" delimiter=",">
+	<sequential>
+	  <fixcrlf srcdir="${core.target}/bin"
+                 includes="**/@{scriptName}"
                  eol="lf"
                  eof="remove" />
-        <chmod dir="${core.target}/bin" includes="**/*.sh" perm="755" />
-    	
+	  <chmod dir="${core.target}/bin" includes="**/@{scriptName}" perm="755" />
+	</sequential>
+	</for>
+	
     	<!-- Create empty ext-enabled folder -->
     	<mkdir dir="${core.target}/bin/ext-enabled"/>
 
@@ -286,10 +305,15 @@
             description="Create zip release of the ${core.target}, in ${core.release} removing source files.">
 
         <!-- Fix the scripts -->
+      	<for list="${scriptFiles}" param="scriptName" delimiter=",">
+        <sequential>
         <fixcrlf srcdir="${core.target}/bin"
-                 includes="**/*.sh"
+                 includes="**/@{scriptName}"
                  eol="lf"
                  eof="remove" />
+	</sequential>
+	</for>	
+
 
         <!-- create the release directory if DNE -->
         <mkdir dir="${core.release}" />
@@ -543,13 +567,27 @@
             </fileset>
         </copy>
 
+	
+	<for list="${scriptFiles}" param="scriptName" delimiter=",">
+		<sequential>
+			<copy todir="${core.target}/bin" preservelastmodified="true">
+				<fileset dir="scripts" includes="**/@{scriptName}" />
+			</copy>
+		</sequential>
+	</for>
+	
         <!-- Copy the Scripts into the target -->
         <copy todir="${core.target}/bin" preservelastmodified="true">
             <fileset dir="scripts" includes="**/*.bat" />
-            <fileset dir="scripts" includes="**/*.sh" />
         </copy>
-        <!-- CHMOD the Linux scripts -->
-        <chmod dir="${core.target}/bin" includes="**/*.sh" perm="755" />
+        
+	<!-- CHMOD the Linux scripts -->
+	<for list="${scriptFiles}" param="scriptName" delimiter=",">
+		<sequential>
+			<chmod dir="${core.target}/bin" includes="**/@{scriptName}" perm="755" />
+		</sequential>
+	</for>
+	
 
         <copy todir="${core.target}/ftl" preservelastmodified="true">
             <fileset dir="ftl">
@@ -636,7 +674,15 @@
 
     <target name="dev-release"
             description="Zip Contents of Target for Development Release">
-        <fixcrlf srcdir="scripts" includes="**/*.sh" eol="lf" eof="remove" />
+      
+      	<for list="${scriptFiles}" param="scriptName" delimiter=",">
+		<sequential>
+			<copy todir="${core.target}/bin" preservelastmodified="true">
+				<fixcrlf srcdir="scripts" includes="**/@{scriptName}" eol="lf" eof="remove" />
+			</copy>
+		</sequential>
+	</for>
+
 
         <!-- create the release directory if DNE -->
         <mkdir dir="release" />
@@ -653,10 +699,16 @@
             </fileset>
             <zipfileset dir="overrides" includes="**/*" prefix="overrides" />
             <zipfileset dir="scripts" includes="**/*.bat" prefix="bin" />
-            <zipfileset dir="scripts"
-                        includes="**/*.sh"
-                        prefix="bin"
-                        filemode="755" />
+            
+	   
+		<for list="${scriptFiles}" param="scriptName" delimiter=",">
+			<sequential>
+				<zipfileset dir="scripts"
+				includes="**/@{scriptName}"
+				prefix="bin"
+				filemode="755" />
+			</sequential>
+		</for>
         </zip>
     </target>
 

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+##
+##	Upgrades Mango Automation core.
+##
+##	Copyright (C) 2014 Infinite Automation Systems Inc. All rights reserved.
+##	@author Matthew Lohbihler
+##
+##	This file was re-wrote by Joseph Mills
+##
+
+. /common
+
+## Check to make sure that this is not a all run 
+## Meaning that it is upgrading all the mods
+if [[ $upgradeArgument != "All"  ]];
+then
+	#This feature does not exist but could be added in future releases
+	# Execute any one-off scripts there may be. Delete when done.
+	## JUNK! !!!       
+	#for f in "$MA_HOME"/bin/upgrades/*.sh
+	#do
+	#    $f
+	#    rm $f
+	#done
+else
+	## remove the old jars
+	removeOldJars;
+	## Unzip core. The exact name is unknown, but there should only be one, so iterate
+	removeOldZips;
+	## change the ownership and also the permissions on the bin dir
+	changeOwnerShip;
+	changeBinPermissions;
+	# We use the function because if verbose is still set then ,,,,  
+	startMango;
+fi

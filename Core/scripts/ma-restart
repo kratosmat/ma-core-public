@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+##
+##	The restart script for Mango Automation.
+##
+##	Copyright (C) 2014 Infinite Automation Systems Inc. All rights reserved.
+##	@author Matthew Lohbihler
+##
+##	This file was re-wrote by Joseph Mills
+##
+. /common
+
+scriptChecker
+
+# If there is a pid file, use it to kill the Java process.
+if [ -f "$MA_HOME"/bin/ma.pid ];
+then
+	echo "$now   ma-restart: restart initiated..." >> $logFile;
+	## echo pleaseRestart > "$MA_HOME"/RESTART  
+	## FIXME what if this is not found ?  
+	## then we should  use ps aux as it is way more realiable
+	kill $mangoPID;
+		if [ $? != 0 ];
+		then 
+			echo "$now     Something went wrong with killing the PID of  $mangoPID" >>  $logFile;
+		else 
+			echo "$now     Sucess Killed the pid of $mangoPID;" >>  $logFile;
+		fi 
+elif [[ $allPID == ""  ]];
+then
+	echo "$now The Pid Was killed and there is no other mangos running " >> $logfile;
+else 
+	echo "$now   Seems like there is still a a pid running ps aux says ...... $findPID " >> $logFile;
+	killPID;
+	
+else
+	echo "No PID file found. Java process not restarted"
+	echo "$now   ps aux says ...... $findPID " >> $logFile;
+fi
+
+##
+## FIXME Where is the restart part ?  
+if [ $? != 0 ];
+then
+	echo "$now something went wrong" >> $logFile;
+else
+	startMango;
+fi
+
+

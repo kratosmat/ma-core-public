@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+##
+##	Start/Stop Script for the Mango Automation
+##
+##	Copyright (C) 2014 Infinite Automation Systems Inc. All rights reserved.
+##	@author Matthew Lohbihler
+##
+##
+##	This file was re-wrote by Joseph Mills
+##
+. /common
+
+## Only set MA_HOME if not already set
+## FIXME all caps vars should only be assigned for system vars
+## EXAMPLE:  say you set a var called USER="bob" This will confict 
+## with the system varible $USER whick is used to get back the current
+## user this is real handy for setting ownership and things to groups. 
+[ -z "$MA_HOME" ] && MA_HOME=$(cd "$PRGDIR/.." >/dev/null; pwd -P)
+
+if [ ! -r "$MA_HOME"/bin/ma ]; 
+then
+	echo "The MA_HOME environment variable is not defined correctly"
+	echo "This environment variable is needed to run this program"
+	exit 1;
+fi
+
+## J: no need to export this why not save as a global var ?
+export MA_HOME
+
+while [ "$#" -gt 0 ]; 
+do
+	case $1 in
+		help|-h|-\?|--help)
+			mainHelp
+		;;
+		verbose|-v|--verbose)
+			$verbose=1 ; ## J: set the verbose (in common) to one if it is added so we can use on all files 
+		;;
+		--start|start)
+			echo "MA_HOME is $MA_HOME"
+			export JPDA EXECJAVA JAVAOPTS SYSOUT SYSERR
+			source "$MA_HOME"/bin/ma-init
+			if [ $verbose >= 1 ];
+			then
+				"$MA_HOME"/bin/ma-start &
+			else
+				"$MA_HOME"/bin/ma-start & 2>&1 /dev/null;
+			if
+		;;
+		--restart|restart) # J: because we are adding the verbose option to the mix we can set that in the script because we are adding common with it
+			source "$MA_HOME"/bin/ma-restart
+		;;
+		stop|--stop)
+			source "$MA_HOME"/bin/ma-stop
+		;;
+		upgrade|--upgrade) ## j: we check the second argument on the 1st if we just want to upgrade a single mod
+			if [ "$#" -gt 1 ];
+			then
+				upgradeArgument=$2
+				"$MA_HOME"/bin/upgrade $2
+			else
+				## we keep the var the same and upgrade everything by default
+				upgradeArgument="All"
+				"$MA_HOME"/bin/upgrade --all 
+			fi
+			;;
+		--) # End of all options.
+			shift
+			break
+		;;
+		-?*) # What are you doing batman lol
+			echo 'WARN: Unknown option (ignored): %s\n' "$1" >&2
+		;;
+		*)
+			echo "Usage: ma [ start --start| stop --stop|restart --restart | h --help help -? | verbose --v --verbose | --upgrade upgrade ]"
+			exit 1
+		;;
+	esac
+done
+exit 0

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+##
+##	Copyright (C) 2014 Infinite Automation Systems Inc. All rights reserved.
+##	@author Matthew Lohbihler
+##
+##	 The initialization script for starting Mango Automation. This contains all of the
+##	 things that should happen only once, as opposed to things that happen each time
+##	 that MA restarts.
+##
+##	 This file Was re-wrote by Joseph Mills
+##
+
+. /common
+
+scriptChecker;
+
+# Delete a pid file if it exists
+rm "$MA_HOME"/bin/ma.pid >/dev/null 2>/dev/null
+
+# Determine the Java home
+if [[ -z "$JAVA_HOME" ]];
+then
+    EXECJAVA=java
+else
+    EXECJAVA=$JAVA_HOME/bin/java
+fi
+
+# Run enabled init extensions.
+##
+## FIXME add the files and also and what not to common for the loop
+##
+if [[ "$(ls -A $MA_HOME/bin/ext-enabled)" ]]; 
+then
+    echo "$now ma-start: running init extensions..." >> $logfile;
+    for f in "$MA_HOME"/bin/ext-enabled/debug "$MA_HOME"/bin/ext-enabled/debug; 
+    do
+        source $f init;
+    done
+fi

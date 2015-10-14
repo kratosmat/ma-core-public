@@ -128,18 +128,25 @@
     <div id="mainContent" style="padding:5px; ">
         <jsp:doBody/>
     </div>
+    
+    <c:if test='<%= Common.license() == null || "free".equals(Common.license().getLicenseType()) %>'>
+      <div style="width: 100%; background-color: #FF7070; font-weight: bold; font-size: 18px; text-align: center; padding: 20px;">
+        For personal use only.
+      </div>
+    </c:if>
+    
     <c:if test="${empty showFooter || showFooter == true}">
-    <div id="footerArea" style="float:left; width:100%; height:60px;">
-      <table width="100%" cellspacing="0" cellpadding="0" border="0">
-        <tr><td colspan="2">&nbsp;</td></tr>
-        <tr>
-          <td colspan="2" class="footer" align="center">&copy;2014 Infinite Automation Systems Inc. <fmt:message key="footer.rightsReserved"/></td>
-        </tr>
-        <tr>
-          <td colspan="2" align="center"><a href="http://www.infiniteautomation.com/" ><b></b>www.InfiniteAutomation.com</a></td>
-        </tr>
-      </table>    
-    </div>
+      <div id="footerArea" style="float:left; width:100%; height:60px;">
+        <table width="100%" cellspacing="0" cellpadding="0" border="0">
+          <tr><td colspan="2">&nbsp;</td></tr>
+          <tr>
+            <td colspan="2" class="footer" align="center">&copy;2014 Infinite Automation Systems Inc. <fmt:message key="footer.rightsReserved"/></td>
+          </tr>
+          <tr>
+            <td colspan="2" align="center"><a href="http://www.infiniteautomation.com/" ><b></b>www.InfiniteAutomation.com</a></td>
+          </tr>
+        </table>    
+      </div>
     </c:if>
 </div>
 

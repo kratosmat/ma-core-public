@@ -1,5 +1,5 @@
 <licenseTypes>
-    <licenseType id="free">
+    <licenseType id="free" status="normal">
         <description>Restricted to 3 unique IP addresses.</description>
         
         <features>
@@ -8,9 +8,12 @@
         
         <price>0</price>
         <price fromType="paid">disallow</price>
+        <price fromType="enterprise">disallow</price>
+        <price fromType="mango-es">disallow</price>
+        <price fromType="mango-gateway">disallow</price>
     </licenseType>
     
-    <licenseType id="paid">
+    <licenseType id="paid" status="normal">
         <description>No restrictions within core.</description>
         
         <features>
@@ -19,5 +22,33 @@
         
         <price>400</price>
         <price fromVersion="1" fromType="paid">350</price>
+        <price fromType="enterprise">disallow</price>
+        <price fromType="embedded">disallow</price>
+        <price fromType="gateway">disallow</price>
+    </licenseType>
+    
+    <licenseType id="enterprise" status="normal">
+        <description>No restrictions within core. Most modules free.</description>
+        <price>2500</price>
+        <price fromType="embedded">disallow</price>
+        <price fromType="gateway">disallow</price>
+    </licenseType>
+    
+    <licenseType id="embedded" status="grant-only">
+        <description>MangoES</description>
+        <price>0</price>
+        <price fromType="free">disallow</price>
+        <price fromType="paid">disallow</price>
+        <price fromType="enterprise">disallow</price>
+        <price fromType="gateway">disallow</price>
+    </licenseType>
+    
+    <licenseType id="gateway" status="grant-only">
+        <description>MangoGateway</description>
+        <price>0</price>
+        <price fromType="free">disallow</price>
+        <price fromType="paid">disallow</price>
+        <price fromType="enterprise">disallow</price>
+        <price fromType="embedded">disallow</price>
     </licenseType>
 </licenseTypes>

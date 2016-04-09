@@ -30,6 +30,7 @@ import com.serotonin.m2m2.module.definitions.LegacyPointDetailsViewPermissionDef
 import com.serotonin.m2m2.module.definitions.UsersViewPermissionDefinition;
 import com.serotonin.m2m2.module.license.LicenseEnforcement;
 import com.serotonin.m2m2.vo.User;
+import com.serotonin.m2m2.vo.permission.PermissionException;
 import com.serotonin.m2m2.vo.permission.Permissions;
 import com.serotonin.m2m2.vo.template.DataPointPropertiesTemplateDefinition;
 import com.serotonin.m2m2.web.mvc.UrlHandler;
@@ -46,8 +47,8 @@ import com.serotonin.m2m2.web.mvc.controller.ShutdownController;
 import com.serotonin.m2m2.web.mvc.controller.StartupController;
 import com.serotonin.m2m2.web.mvc.controller.UnauthorizedController;
 import com.serotonin.m2m2.web.mvc.controller.UsersController;
-import com.serotonin.m2m2.web.mvc.rest.v1.model.DemoModelDefinition;
 import com.serotonin.m2m2.web.mvc.rest.v1.model.RestErrorModelDefinition;
+import com.serotonin.m2m2.web.mvc.rest.v1.model.jsondata.JsonDataModelDefinition;
 
 /**
  * The registry of all modules in an MA instance.
@@ -55,6 +56,9 @@ import com.serotonin.m2m2.web.mvc.rest.v1.model.RestErrorModelDefinition;
  * @author Matthew Lohbihler
  */
 public class ModuleRegistry {
+	
+	public static final String SYSTEM_SETTINGS_URL = "/system_settings.shtm";
+	
     private static final Object LOCK = new Object();
     private static final Map<String, Module> MODULES = new LinkedHashMap<String, Module>();
 
@@ -411,7 +415,7 @@ public class ModuleRegistry {
 
             @Override
             public String getFirstUserLoginPageUri(HttpServletRequest request, HttpServletResponse response, User user) {
-                return "/help.shtm";
+                return "/help.htm";
             }
 
             @Override
@@ -422,6 +426,7 @@ public class ModuleRegistry {
         
         //Add in core Models
         preDefaults.add(new RestErrorModelDefinition());
+        preDefaults.add(new JsonDataModelDefinition());
         //TODO Add env property to load the Demo Swagger Endpoint then re-enable the demo controller
         //preDefaults.add(new DemoModelDefinition());
 
@@ -453,7 +458,7 @@ public class ModuleRegistry {
         preDefaults.add(createMenuItemDefinition("publishersMi", Visibility.ADMINISTRATOR, "header.publishers",
                 "transmit", "/publishers.shtm"));
         preDefaults.add(createMenuItemDefinition("systemSettingsMi", Visibility.ADMINISTRATOR, "header.systemSettings",
-                "application_form", "/system_settings.shtm"));
+                "application_form", SYSTEM_SETTINGS_URL));
         preDefaults.add(createMenuItemDefinition("modulesMi", Visibility.ADMINISTRATOR, "header.modules", "puzzle",
                 "/modules.shtm"));
         preDefaults.add(createMenuItemDefinition("emportMi", Visibility.ADMINISTRATOR, "header.emport", "emport",
@@ -491,20 +496,20 @@ public class ModuleRegistry {
         preDefaults.add(createUriMappingDefinition(Permission.USER, "/mobile_data_point_details.shtm",
                 new DataPointDetailsController(), "/WEB-INF/jsp/mobile/dataPointDetails.jsp"));
 
-        preDefaults.add(createMenuItemDefinition("helpMi", Visibility.ANONYMOUS, "header.help", "help", "/help.shtm"));
+        preDefaults.add(createMenuItemDefinition("helpMi", Visibility.ANONYMOUS, "header.help", "help", "/help.htm"));
     
         /* Controller Mappings */
         preDefaults.add(createControllerMappingDefinition(Permission.USER, "/data_point_edit.shtm", new DataPointEditController()));
         preDefaults.add(createControllerMappingDefinition(Permission.USER, "/data_source_properties.shtm", new DataSourcePropertiesController()));
         preDefaults.add(createControllerMappingDefinition(Permission.USER, "/data_source_edit.shtm", new DataSourceEditController()));
         preDefaults.add(createControllerMappingDefinition(Permission.USER, "/data_source_properties_error.shtm", new DataSourceEditController()));
-        preDefaults.add(createControllerMappingDefinition(Permission.ANONYMOUS, "/help.shtm", new HelpController()));
+        preDefaults.add(createControllerMappingDefinition(Permission.ANONYMOUS, "/help.htm", new HelpController()));
         preDefaults.add(createControllerMappingDefinition(Permission.ANONYMOUS, "/startup.htm", new StartupController()));
         preDefaults.add(createControllerMappingDefinition(Permission.ANONYMOUS, "/shutdown.htm", new ShutdownController()));
         preDefaults.add(createControllerMappingDefinition(Permission.ANONYMOUS, "/logout.htm", new LogoutController()));
         preDefaults.add(createControllerMappingDefinition(Permission.USER, "/publisher_edit.shtm", new PublisherEditController()));
         preDefaults.add(createControllerMappingDefinition(Permission.ANONYMOUS, "/unauthorized.htm", new UnauthorizedController()));
-        preDefaults.add(createControllerMappingDefinition(Permission.USER, "/users.shtm", new UsersController()));
+        preDefaults.add(createControllerMappingDefinition(Permission.CUSTOM, "/users.shtm", new UsersController(), UsersViewPermissionDefinition.PERMISSION));
         
     }
 
@@ -673,6 +678,34 @@ public class ModuleRegistry {
             @Override
             public Controller getController() {
                 return controller;
+            }
+        };
+    }
+    
+    static ControllerMappingDefinition createControllerMappingDefinition(final Permission level, final String path,
+            final Controller controller, final String permission) {
+        return new ControllerMappingDefinition() {
+            @Override
+            public Permission getPermission() {
+                return level;
+            }
+            
+            @Override
+            public String getPath() {
+                return path;
+            }
+
+            @Override
+            public Controller getController() {
+                return controller;
+            }
+            /* (non-Javadoc)
+             * @see com.serotonin.m2m2.module.ControllerMappingDefinition#hasCustomPermission(com.serotonin.m2m2.vo.User)
+             */
+            @Override
+            public boolean hasCustomPermission(User user)
+            		throws PermissionException {
+            	return Permissions.hasPermission(user, SystemSettingsDao.getValue(permission));
             }
         };
     }

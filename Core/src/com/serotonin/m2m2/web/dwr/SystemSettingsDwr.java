@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -45,6 +46,13 @@ import com.serotonin.util.DirectoryInfo;
 import com.serotonin.util.DirectoryUtils;
 
 public class SystemSettingsDwr extends BaseDwr {
+	
+	private static final String EMAIL_PATTERN = 
+			"^[_A-Za-z0-9-\\+]+(\\.[_A-Za-z0-9-]+)*@"
+			+ "[A-Za-z0-9-]+(\\.[A-Za-z0-9]+)*(\\.[A-Za-z]{2,})$";
+	private Pattern emailPattern = Pattern.compile(EMAIL_PATTERN);
+	
+	
     @DwrPermission(admin = true)
     public Map<String, Object> getSettings() {
         Map<String, Object> settings = new HashMap<>();
@@ -247,6 +255,10 @@ public class SystemSettingsDwr extends BaseDwr {
         //Virtual Serial Ports
         settings.put("virtualSerialPorts", VirtualSerialPortConfigDao.instance.getAll());
         
+        //Site analytics
+        settings.put(SystemSettingsDao.SITE_ANALYTICS_HEAD, SystemSettingsDao.getValue(SystemSettingsDao.SITE_ANALYTICS_HEAD));
+        settings.put(SystemSettingsDao.SITE_ANALYTICS_BODY, SystemSettingsDao.getValue(SystemSettingsDao.SITE_ANALYTICS_BODY));
+        
         return settings;
     }
 
@@ -293,20 +305,50 @@ public class SystemSettingsDwr extends BaseDwr {
     }
 
     @DwrPermission(admin = true)
-    public void saveEmailSettings(String host, int port, String from, String name, boolean auth, String username,
+    public ProcessResult saveEmailSettings(String host, int port, String from, String name, boolean auth, String username,
             String password, boolean tls, int contentType) {
-        SystemSettingsDao systemSettingsDao = new SystemSettingsDao();
-        systemSettingsDao.setValue(SystemSettingsDao.EMAIL_SMTP_HOST, host);
-        systemSettingsDao.setIntValue(SystemSettingsDao.EMAIL_SMTP_PORT, port);
-        systemSettingsDao.setValue(SystemSettingsDao.EMAIL_FROM_ADDRESS, from);
-        systemSettingsDao.setValue(SystemSettingsDao.EMAIL_FROM_NAME, name);
-        systemSettingsDao.setBooleanValue(SystemSettingsDao.EMAIL_AUTHORIZATION, auth);
-        systemSettingsDao.setValue(SystemSettingsDao.EMAIL_SMTP_USERNAME, username);
-        systemSettingsDao.setValue(SystemSettingsDao.EMAIL_SMTP_PASSWORD, password);
-        systemSettingsDao.setBooleanValue(SystemSettingsDao.EMAIL_TLS, tls);
-        systemSettingsDao.setIntValue(SystemSettingsDao.EMAIL_CONTENT_TYPE, contentType);
+        
+    	ProcessResult response = new ProcessResult();
+    	SystemSettingsDao systemSettingsDao = new SystemSettingsDao();
+
+    	if(port < 0)
+    		response.addContextualMessage(SystemSettingsDao.EMAIL_SMTP_PORT, "validate.cannotBeNegative");
+    	if(!emailPattern.matcher(from).matches())
+    		response.addContextualMessage(SystemSettingsDao.EMAIL_FROM_ADDRESS, "validate.invalidValue");
+    		
+    	//If valid then save all
+    	if(!response.getHasMessages()){
+    		systemSettingsDao.setValue(SystemSettingsDao.EMAIL_SMTP_HOST, host);
+	        systemSettingsDao.setIntValue(SystemSettingsDao.EMAIL_SMTP_PORT, port);
+	        systemSettingsDao.setValue(SystemSettingsDao.EMAIL_FROM_ADDRESS, from);
+	        systemSettingsDao.setValue(SystemSettingsDao.EMAIL_FROM_NAME, name);
+	        systemSettingsDao.setBooleanValue(SystemSettingsDao.EMAIL_AUTHORIZATION, auth);
+	        systemSettingsDao.setValue(SystemSettingsDao.EMAIL_SMTP_USERNAME, username);
+	        systemSettingsDao.setValue(SystemSettingsDao.EMAIL_SMTP_PASSWORD, password);
+	        systemSettingsDao.setBooleanValue(SystemSettingsDao.EMAIL_TLS, tls);
+	        systemSettingsDao.setIntValue(SystemSettingsDao.EMAIL_CONTENT_TYPE, contentType);
+    	}
+        
+        return response;
     }
 
+    @DwrPermission(admin = true)
+    public ProcessResult saveSiteAnalytics(String siteAnalyticsHead, String siteAnalyticsBody) {
+        
+    	ProcessResult response = new ProcessResult();
+    	SystemSettingsDao systemSettingsDao = new SystemSettingsDao();
+
+    	//TODO Add some validation, not sure what yet
+    	
+    	//If valid then save all
+    	if(!response.getHasMessages()){
+    		systemSettingsDao.setValue(SystemSettingsDao.SITE_ANALYTICS_HEAD, siteAnalyticsHead);
+	        systemSettingsDao.setValue(SystemSettingsDao.SITE_ANALYTICS_BODY, siteAnalyticsBody);
+	    }
+        
+        return response;
+    }
+    
     @DwrPermission(admin = true)
     public ProcessResult saveThreadPoolSettings(int highPriorityCorePoolSize, int highPriorityMaxPoolSize, 
     		int medPriorityCorePoolSize, int lowPriorityCorePoolSize) {

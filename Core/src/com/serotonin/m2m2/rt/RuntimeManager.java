@@ -78,7 +78,7 @@ public class RuntimeManager {
 
         // Set the started indicator to true.
         started = true;
-
+        
         //Get the RTM defs from modules
         List<RuntimeManagerDefinition> defs = ModuleRegistry.getDefinitions(RuntimeManagerDefinition.class);
         Collections.sort(defs, new Comparator<RuntimeManagerDefinition>() {
@@ -90,7 +90,7 @@ public class RuntimeManager {
 
         // Start everything with priority up to and including 4.
         int rtmdIndex = startRTMDefs(defs, safe, 0, 4);
-
+        
         // Initialize data sources that are enabled. Start by organizing all enabled data sources by start priority.
         DataSourceDao dataSourceDao = DaoRegistry.dataSourceDao;
         List<DataSourceVO<?>> configs = dataSourceDao.getDataSources();
@@ -114,13 +114,13 @@ public class RuntimeManager {
 
         // Initialize the prioritized data sources. Start the polling later.
         List<DataSourceVO<?>> pollingRound = new ArrayList<DataSourceVO<?>>();
+        int dataSourceStartupThreads = Common.envProps.getInt("runtime.datasource.startupThreads", 8);
+        boolean useMetrics = Common.envProps.getBoolean("runtime.datasource.logStartupMetrics", false);
         for (DataSourceDefinition.StartPriority startPriority : DataSourceDefinition.StartPriority.values()) {
             List<DataSourceVO<?>> priorityList = priorityMap.get(startPriority);
             if (priorityList != null) {
-                for (DataSourceVO<?> config : priorityList) {
-                    if (initializeDataSource(config))
-                        pollingRound.add(config);
-                }
+            	DataSourceGroupInitializer initializer = new DataSourceGroupInitializer(startPriority, priorityList, useMetrics, dataSourceStartupThreads);
+            	pollingRound.addAll(initializer.initialize());
             }
         }
 
@@ -157,6 +157,7 @@ public class RuntimeManager {
 	        }
 
         }
+        
     }
 
     synchronized public void terminate() {
@@ -191,12 +192,14 @@ public class RuntimeManager {
             priorityList.add(rt);
         }
 
+        int dataSourceStartupThreads = Common.envProps.getInt("runtime.datasource.startupThreads", 8);
+        boolean useMetrics = Common.envProps.getBoolean("runtime.datasource.logStartupMetrics", false);
         DataSourceDefinition.StartPriority[] priorities = DataSourceDefinition.StartPriority.values();
         for (int i = priorities.length - 1; i >= 0; i--) {
             List<DataSourceRT> priorityList = priorityMap.get(priorities[i]);
             if (priorityList != null) {
-                for (DataSourceRT rt : priorityList)
-                    stopDataSource(rt.getId());
+            	DataSourceGroupTerminator initializer = new DataSourceGroupTerminator(priorities[i], priorityList, useMetrics, dataSourceStartupThreads);
+                initializer.terminate();
             }
         }
 
@@ -306,6 +309,46 @@ public class RuntimeManager {
         }
     }
 
+    /**
+     * Only to be used at startup as the synchronization has been reduced for performance
+     * @param vo
+     * @return
+     */
+    boolean initializeDataSourceStartup(DataSourceVO<?> vo) {
+    	long startTime = System.nanoTime();
+
+        // If the data source is already running, just quit.
+        if (isDataSourceRunning(vo.getId()))
+            return false;
+
+        // Ensure that the data source is enabled.
+        Assert.isTrue(vo.isEnabled());
+
+        // Create and initialize the runtime version of the data source.
+        DataSourceRT dataSource = vo.createDataSourceRT();
+        dataSource.initialize();
+
+        // Add it to the list of running data sources.
+        synchronized(runningDataSources) {
+        	runningDataSources.add(dataSource);
+        }
+        
+        // Add the enabled points to the data source.
+        List<DataPointVO> dataSourcePoints = DaoRegistry.dataPointDao.getDataPoints(vo.getId(), null);
+        for (DataPointVO dataPoint : dataSourcePoints) {
+            if (dataPoint.isEnabled())
+                startDataPointStartup(dataPoint);
+        }
+
+        LOG.info("Data source '" + vo.getName() + "' initialized");
+
+    	long endTime = System.nanoTime();
+
+    	long duration = endTime - startTime;
+    	LOG.info("Data source '" + vo.getName() + "' took " + (double)duration/(double)1000000 + "ms to start");
+        return true;
+    }
+    
     private void startDataSourcePolling(DataSourceVO<?> vo) {
         DataSourceRT dataSource = getRunningDataSource(vo.getId());
         if (dataSource != null)
@@ -314,22 +357,53 @@ public class RuntimeManager {
 
     private void stopDataSource(int id) {
         synchronized (runningDataSources) {
+
             DataSourceRT dataSource = getRunningDataSource(id);
             if (dataSource == null)
                 return;
+	        try{	
+	            // Stop the data points.
+	            for (DataPointRT p : dataPoints.values()) {
+	                if (p.getDataSourceId() == id)
+	                    stopDataPoint(p.getId());
+	            }
+	
+	            runningDataSources.remove(dataSource);
+	            dataSource.terminate();
+	
+	            dataSource.joinTermination();
+	            LOG.info("Data source '" + dataSource.getName() + "' stopped");
+        	}catch(Exception e){
+        		LOG.error("Data source '" + dataSource.getName() + "' failed proper termination.", e);
+        	}
+        }
+    }
+    
+    /**
+     * Should only be called at Shutdown as synchronization has been reduced for performance
+     */
+    void stopDataSourceShutdown(int id) {
 
+        DataSourceRT dataSource = getRunningDataSource(id);
+        if (dataSource == null)
+            return;
+        try{	
             // Stop the data points.
             for (DataPointRT p : dataPoints.values()) {
                 if (p.getDataSourceId() == id)
-                    stopDataPoint(p.getId());
+                    stopDataPointShutdown(p.getId());
             }
-
-            runningDataSources.remove(dataSource);
+            synchronized (runningDataSources) {
+            	runningDataSources.remove(dataSource);
+            }
+            
             dataSource.terminate();
 
             dataSource.joinTermination();
             LOG.info("Data source '" + dataSource.getName() + "' stopped");
-        }
+    	}catch(Exception e){
+    		LOG.error("Data source '" + dataSource.getName() + "' failed proper termination.", e);
+    	}
     }
 
     //
@@ -421,6 +495,56 @@ public class RuntimeManager {
         }
     }
 
+    /**
+     * Only to be used at startup as synchronization has been reduced for performance
+     * @param vo
+     */
+    private void startDataPointStartup(DataPointVO vo) {
+        Assert.isTrue(vo.isEnabled());
+
+        // Only add the data point if its data source is enabled.
+        DataSourceRT ds = getRunningDataSource(vo.getDataSourceId());
+        if (ds != null) {
+            // Change the VO into a data point implementation.
+            DataPointRT dataPoint = new DataPointRT(vo, vo.getPointLocator().createRuntime());
+
+            // Add/update it in the data image.
+            synchronized (dataPoints) {
+            	dataPoints.put(dataPoint.getId(), dataPoint);
+            }
+
+            // Initialize it.
+            dataPoint.initialize();
+            
+            //If we are a polling data source then we need to wait to start our interval logging
+            // until the first poll due to quantization
+            boolean isPolling = ds instanceof PollingDataSource;
+            
+            //If we are not polling go ahead and start the interval logging, otherwise we will let the data source do it on the first poll
+            if(!isPolling)
+            	dataPoint.initializeIntervalLogging(0l, false);
+            
+            DataPointListener l = getDataPointListeners(vo.getId());
+            if (l != null)
+                l.pointInitialized();
+
+            // Add/update it in the data source.
+            try{
+            	ds.addDataPoint(dataPoint);
+            }catch(Exception e){
+            	//This can happen if there is a corrupt DB with a point for a different 
+            	// data source type linked to this data source...
+            	LOG.error("Failed to start point with xid: " + dataPoint.getVO().getXid()
+            			+ " disabling point."
+            			, e);
+            	//TODO Fire Alarm to warn user.
+            	//Common.eventManager.raiseEvent(type, time, rtnApplicable, alarmLevel, message, context);
+            	dataPoint.getVO().setEnabled(false);
+            	saveDataPoint(dataPoint.getVO()); //Stop it
+            }
+        }
+    }
+    
     private void stopDataPoint(int dataPointId) {
         synchronized (dataPoints) {
             // Remove this point from the data image if it is there. If not, just quit.
@@ -443,6 +567,38 @@ public class RuntimeManager {
         }
     }
 
+    /**
+     * Only to be used at shutdown as synchronization has been reduced for performance
+     */
+    private void stopDataPointShutdown(int dataPointId) {
+        
+    	DataPointRT p = null;
+    	synchronized (dataPoints) {
+            // Remove this point from the data image if it is there. If not, just quit.
+            p = dataPoints.remove(dataPointId);
+    	}
+        // Remove it from the data source, and terminate it.
+        if (p != null) {
+        	try{
+        		getRunningDataSource(p.getDataSourceId()).removeDataPoint(p);
+        	}catch(Exception e){
+        		LOG.error("Failed to stop point RT with ID: " + dataPointId
+            			+ " stopping point."
+            			, e);
+        	}
+            DataPointListener l = getDataPointListeners(dataPointId);
+            if (l != null)
+                l.pointTerminated();
+            p.terminate();
+        }
+
+    }
+    
+    public void restartDataPoint(DataPointVO vo){
+    	this.stopDataPoint(vo.getId());
+    	this.startDataPoint(vo);
+    }
+    
     public boolean isDataPointRunning(int dataPointId) {
         return dataPoints.get(dataPointId) != null;
     }

@@ -54,7 +54,6 @@
   
   <category name="org.directwebremoting"><level value="warn"/></category>
   <category name="org.springframework"><level value="error"/></category>
-  <category name="com.serotonin.db.spring.ExtendedJdbcTemplate"><level value="debug"/></category>
   <category name="com.serotonin.m2m2"><level value="debug"/></category>
   <category name="com.serotonin.ma"><level value="debug"/></category>
   <category name="com.serotonin.m2m2.persistent"><level value="debug"/></category>
@@ -71,6 +70,8 @@
   <category name="com.fasterxml"><level value="debug"/></category>
   <!-- For Brewers Dashboard -->
   <category name="com.infiniteautomation.brewersdashboard.rt"><level value="debug"/></category>
+  <!-- For BACnet4J -->
+  <category name="com.serotonin.bacnet4j"><level value="debug"/></category>
     
   <root>
     <level value="error"/>

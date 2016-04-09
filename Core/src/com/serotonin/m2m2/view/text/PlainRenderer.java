@@ -45,6 +45,7 @@ public class PlainRenderer extends ConvertingRenderer {
     
     public PlainRenderer() {
         super();
+        setDefaults();
     }
     
     /**
@@ -67,7 +68,7 @@ public class PlainRenderer extends ConvertingRenderer {
     
     @Override
     protected void setDefaults() {
-        super.setDefaults();
+    	super.setDefaults();
         suffix = "";
     }
 
@@ -153,20 +154,15 @@ public class PlainRenderer extends ConvertingRenderer {
     // Serialization
     //
     private static final long serialVersionUID = -1;
-    private static final int version = 3;
+    private static final int version = 5;
 
     private void writeObject(ObjectOutputStream out) throws IOException {
         out.writeInt(version);
         SerializationHelper.writeSafeUTF(out, suffix);
-        out.writeBoolean(useUnitAsSuffix);
-        out.writeObject(unit);
-        out.writeObject(renderedUnit);
     }
 
     private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
         int ver = in.readInt();
-        
-        setDefaults();
 
         // Switch on the version of the class so that version changes can be elegantly handled.
         if (ver == 1) {
@@ -182,6 +178,21 @@ public class PlainRenderer extends ConvertingRenderer {
             useUnitAsSuffix = in.readBoolean();
             unit = (Unit<?>) in.readObject();
             renderedUnit = (Unit<?>) in.readObject();
+        }else if (ver == 4){
+        	suffix = SerializationHelper.readSafeUTF(in);
+            useUnitAsSuffix = in.readBoolean();
+            try{
+            	unit = UnitUtil.parseUcum(SerializationHelper.readSafeUTF(in));
+            }catch(Exception e){
+            	unit = Unit.ONE;
+            }
+            try{
+            	renderedUnit = UnitUtil.parseUcum(SerializationHelper.readSafeUTF(in));
+            }catch(Exception e){
+            	renderedUnit = Unit.ONE;
+            }
+        }else if (ver == 5){
+        	suffix = SerializationHelper.readSafeUTF(in);
         }
     }
     

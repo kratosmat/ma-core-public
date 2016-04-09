@@ -1,3 +1,47 @@
+*Version 2.7.10*
+* Fixing bug in upgrade and create-tables scripts for MySQL
+
+*Version 2.7.8*
+* NoSQL Database env.property to change file access type for improved performance on various systems.
+* Fixed bug in multi-threaded startup that would fail to initialze some data sources if the number of threads used was greater than the number of running data sources.
+* Added JSON Data for custom data storage
+* Replacing Spline plot type renderer on for JFree Image Chart to reduce artifacts on plots, Spline type lines are now rendered as Lines.
+
+*Version 2.7.6*
+* Adding db.nosql env properties to allow setting the location of the NoSQL data store
+* Fixed bug where HTML5 pages didn't save URL parameters on a User's home URL
+* Fixed bug where OSX could have problems with XHR requests from the UI
+* Added tooltips to all icons on HTML5 page toolbar
+* Adding Angular support for new Mango Angular Directives
+* Startup script change to create logs directory on first run to capture script output
+* Fixed charting for Safari and iOS via AmCharts
+
+*Version 2.7.4*
+* Adding multi-threading to data source initialization
+* Change to allow i-frame embedding of Mango hosted pages on Mango Hosted pages
+* Change to ensure NONE level events do not make it into the User's Live events list
+* Added latest poll times and durations to data sources edit page under the 'Runtime status' area
+* Added env property runtime.datasources.logStartupMetrics to allow output of startup times for data source groups
+* Added device name to event messages for data points
+* Added env property runtime.realTimeTimer.defaultTaskQueueSize to allow optionally queuing up tasks of the same type
+* Added env property runtime.realTimeTimer.flushTaskQueueOnReject to optionally flush the stale tasks from the queue
+* Raising events for High priority thread pool's rejected tasks
+* Fixed bug where copying a running data source would result in the points not actually being running
+* Fixed bug where the PlainRenderer would fail to render some units
+* Improved performance of the UserEventCache that caches events for the logged in Users
+* Improved performance of the EventManager's active events list
+* Added system settings to allow Site Analytics code to be added into the HTML of all pages
+* Fixed bug where deleting a user linked to an email event handler would break the event handler
+* Adding support for HTML5 Audio to play Alarm sounds on all pages
+* Performance enhancements to improve maximum poll rates for data sources 
+
+*Version 2.7.2*
+* Fixed bug where uploading point values was being reject as a security breach
+* Fixed bug where failures during stopping a datasource could cause it to become out of sync with the UI
+* Fixed bug where adding points via the Data Source discovery tools could cause a spurious pop up that would not allow saving the point
+* Now able to toggle mute via HTML5 pages, still cannot play sounds though
+* Fixes to Linux startup scripts for installations with spaces in the path
+
 *Version 2.7.0*
 * Added ability to configure the search path and regex for serial ports
 * Fixed bug when setting Low and Medium priority thread pools to large values would cause mango to fail to restart

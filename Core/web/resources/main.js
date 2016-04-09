@@ -14,6 +14,9 @@ require(['jquery', 'mango/api', 'view/ToolbarUtilities', 'es5-shim', 'domReady!'
 			toolbarUtilities.setupTranslations()).then(MangoAPI.firstArrayArg)
 	.done(function(user, activeEvents){
 		
+		//Setup the Sound Player
+		toolbarUtilities.setupSoundPlayer(user.muted);
+		
 		//Setup the Mute Icon
 		var userMutedIcon = $('#userMutedIcon');
 		if(user.muted === true){
@@ -27,7 +30,20 @@ require(['jquery', 'mango/api', 'view/ToolbarUtilities', 'es5-shim', 'domReady!'
 		}
 		userMutedIcon.on('click', function(){
 			toolbarUtilities.api.toggleUserMute(user.username).done(function(response){
+				
+				//Toggle the mute
+				toolbarUtilities.soundPlayer.setMute(response.muted);
+				
 				//Flip the icon to the current state
+				if(response.muted === true){
+					userMutedIcon.attr('src', '/images/sound_mute.png');
+					userMutedIcon.attr('alt', toolbarUtilities.tr('header.mute'));
+					userMutedIcon.attr('title', toolbarUtilities.tr('header.mute'));
+				}else{
+					userMutedIcon.attr('src', '/images/sound_none.png');
+					userMutedIcon.attr('alt', toolbarUtilities.tr('header.unmute'));
+					userMutedIcon.attr('title', toolbarUtilities.tr('header.unmute'));
+				}
 			}).fail(toolbarUtilities.showError);
 		});
 		
@@ -54,8 +70,9 @@ require(['jquery', 'mango/api', 'view/ToolbarUtilities', 'es5-shim', 'domReady!'
 		
 		//Setup the save home URL Icon
 		$('#saveHome').on('click', function(){
-			toolbarUtilities.api.setHomeURL(user.username, window.location.pathname).done(function(response){
-				user.homeUrl = window.location.pathname;
+			var userHomeUrl = window.location.href;
+			toolbarUtilities.api.setHomeURL(user.username, userHomeUrl).done(function(response){
+				user.homeUrl = userHomeUrl;
 				toolbarUtilities.showSuccess(toolbarUtilities.tr('header.homeUrlSaved'));
 			}).fail(toolbarUtilities.showError);
 		});

@@ -46,6 +46,7 @@ public class RangeRenderer extends ConvertingRenderer {
     
     public RangeRenderer() {
         super();
+        setDefaults();
     }
     
     /**
@@ -58,7 +59,7 @@ public class RangeRenderer extends ConvertingRenderer {
     
     @Override
     protected void setDefaults() {
-        super.setDefaults();
+    	super.setDefaults();
         format = "";
         rangeValues = new ArrayList<RangeValue>();
     }
@@ -143,22 +144,17 @@ public class RangeRenderer extends ConvertingRenderer {
     // Serialization
     //
     private static final long serialVersionUID = -1;
-    private static final int version = 2;
+    private static final int version = 3;
 
     private void writeObject(ObjectOutputStream out) throws IOException {
         out.writeInt(version);
         SerializationHelper.writeSafeUTF(out, format);
         out.writeObject(rangeValues);
-        out.writeBoolean(useUnitAsSuffix);
-        out.writeObject(unit);
-        out.writeObject(renderedUnit);
     }
 
     @SuppressWarnings("unchecked")
     private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
         int ver = in.readInt();
-        
-        setDefaults();
         
         // Switch on the version of the class so that version changes can be elegantly handled.
         if (ver == 1) {
@@ -172,6 +168,9 @@ public class RangeRenderer extends ConvertingRenderer {
             useUnitAsSuffix = in.readBoolean();
             unit = (Unit<?>) in.readObject();
             renderedUnit = (Unit<?>) in.readObject();
+        }else if (ver == 3){
+            format = SerializationHelper.readSafeUTF(in);
+            rangeValues = (List<RangeValue>) in.readObject();
         }
     }
 	/* (non-Javadoc)

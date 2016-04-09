@@ -7,9 +7,12 @@ package com.serotonin.m2m2.rt;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -43,7 +46,9 @@ public class EventManager implements ILifecycle {
 
 	private final List<EventManagerListenerDefinition> listeners = new CopyOnWriteArrayList<EventManagerListenerDefinition>();
 	private final List<UserEventListener> userEventListeners = new CopyOnWriteArrayList<UserEventListener>();
-	private final List<EventInstance> activeEvents = new CopyOnWriteArrayList<EventInstance>();
+	private final ReadWriteLock activeEventsLock = new ReentrantReadWriteLock();
+	private final List<EventInstance> activeEvents = new ArrayList<EventInstance>();
+	private final ReadWriteLock recentEventsLock = new ReentrantReadWriteLock();
 	private final List<EventInstance> recentEvents = new ArrayList<EventInstance>();
 	private EventDao eventDao;
 	private UserDao userDao;
@@ -110,29 +115,32 @@ public class EventManager implements ILifecycle {
 		List<Integer> eventUserIds = new ArrayList<Integer>();
 		Set<String> emailUsers = new HashSet<String>();
 
-		for (User user : userDao.getActiveUsers()) {
-			// Do not create an event for this user if the event type says the
-			// user should be skipped.
-			if (type.excludeUser(user))
-				continue;
-
-			if (Permissions.hasEventTypePermission(user, type)) {
-				eventUserIds.add(user.getId());
-				if (evt.isAlarm() && user.getReceiveAlarmEmails() > 0
-						&& alarmLevel >= user.getReceiveAlarmEmails())
-					emailUsers.add(user.getEmail());
-			
-				//Notify All User Event Listeners of the new event
-				for(UserEventListener l : this.userEventListeners){
-					if(l.getUserId() == user.getId()){
-						Common.backgroundProcessing.addWorkItem(new EventNotifyWorkItem(user, l, evt, true, false, false, false));
+		//So none level events don't make it into the cache as they are already acknowledged
+		if(evt.isAlarm()){
+			for (User user : userDao.getActiveUsers()) {
+				// Do not create an event for this user if the event type says the
+				// user should be skipped.
+				if (type.excludeUser(user))
+					continue;
+	
+				if (Permissions.hasEventTypePermission(user, type)) {
+					eventUserIds.add(user.getId());
+					if (evt.isAlarm() && user.getReceiveAlarmEmails() > 0
+							&& alarmLevel >= user.getReceiveAlarmEmails())
+						emailUsers.add(user.getEmail());
+				
+					//Notify All User Event Listeners of the new event
+					for(UserEventListener l : this.userEventListeners){
+						if(l.getUserId() == user.getId()){
+							Common.backgroundProcessing.addWorkItem(new EventNotifyWorkItem(user, l, evt, true, false, false, false));
+						}
 					}
+				
+					//Add to the UserEventCache if the user has recently accessed their events
+					this.userEventCache.addEvent(user.getId(), evt);
 				}
-			
-				//Add to the UserEventCache if the user has recently accessed thier events
-				this.userEventCache.addEvent(user.getId(), evt);
+				
 			}
-			
 		}
 
 		if ((eventUserIds.size() > 0)&&(alarmLevel != AlarmLevels.DO_NOT_LOG)) {
@@ -141,11 +149,19 @@ public class EventManager implements ILifecycle {
 				lastAlarmTimestamp = System.currentTimeMillis();
 		}
 
-		if (evt.isRtnApplicable())
-			activeEvents.add(evt);
-		else if (evt.getEventType().isRateLimited()) {
-			synchronized (emailUsers) {
+		if (evt.isRtnApplicable()){
+			activeEventsLock.writeLock().lock();
+			try{
+				activeEvents.add(evt);
+			}finally{
+				activeEventsLock.writeLock().unlock();
+			}
+		}else if (evt.getEventType().isRateLimited()) {
+			recentEventsLock.writeLock().lock();
+			try{
 				recentEvents.add(evt);
+			}finally{
+				recentEventsLock.writeLock().unlock();
 			}
 		}
 
@@ -206,8 +222,9 @@ public class EventManager implements ILifecycle {
 
 	private boolean isRecent(EventType type, TranslatableMessage message) {
 		long cutoff = System.currentTimeMillis() - RECENT_EVENT_PERIOD;
-		// Iterate through the recent events list.
-		synchronized (recentEvents) {
+		
+		recentEventsLock.writeLock().lock();
+		try{
 			for (int i = recentEvents.size() - 1; i >= 0; i--) {
 				EventInstance evt = recentEvents.get(i);
 				// This method also purges the list, so we need to check if the
@@ -218,7 +235,10 @@ public class EventManager implements ILifecycle {
 						&& evt.getMessage().equals(message))
 					return true;
 			}
+		}finally{
+			recentEventsLock.writeLock().unlock();
 		}
+
 		return false;
 	}
 
@@ -270,14 +290,15 @@ public class EventManager implements ILifecycle {
 	}
 
 	/**
-	 * Deactivate a group of simmilar events
+	 * Deactivate a group of simmilar events, these events should have been removed from the active events list already.
+	 * 
 	 * @param evts
 	 * @param time
 	 * @param inactiveCause
 	 */
 	private void deactivateEvents(List<EventInstance> evts, long time, int inactiveCause) {
 		List<User> activeUsers = userDao.getActiveUsers();
-		activeEvents.removeAll(evts);
+
 		List<Integer> eventIds = new ArrayList<Integer>();
 		for(EventInstance evt : evts){
 			if(evt.isActive())
@@ -351,9 +372,19 @@ public class EventManager implements ILifecycle {
 	 * @return
 	 */
 	public int purgeAllEvents(){
-		activeEvents.clear();
-		synchronized (recentEvents) {
+		
+		activeEventsLock.writeLock().lock();
+		try{
+			activeEvents.clear();
+		}finally{
+			activeEventsLock.writeLock().unlock();
+		}
+			
+		recentEventsLock.writeLock().lock();
+		try{
 			recentEvents.clear();
+		}finally{
+			recentEventsLock.writeLock().unlock();
 		}
 		
 		userEventCache.purgeAllEvents();
@@ -367,21 +398,29 @@ public class EventManager implements ILifecycle {
 	 * @return
 	 */
 	public int purgeEventsBefore(final long time){
-		List<EventInstance> toRemove = new ArrayList<EventInstance>();
-		for (EventInstance e : activeEvents) {
-			if(e.getActiveTimestamp() < time){
-				toRemove.add(e);
+		
+		activeEventsLock.writeLock().lock();
+		try{
+			ListIterator<EventInstance> it = activeEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if(e.getActiveTimestamp() < time)
+					it.remove();
 			}
+		}finally{
+			activeEventsLock.writeLock().unlock();
 		}
-		activeEvents.removeAll(toRemove);
-		toRemove.clear();
-		synchronized (recentEvents) {
-			for (EventInstance e : recentEvents) {
-				if(e.getActiveTimestamp() < time){
-					toRemove.add(e);
-				}
+		
+		recentEventsLock.writeLock().lock();
+		try{
+			ListIterator<EventInstance> it = recentEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if(e.getActiveTimestamp() < time)
+					it.remove();
 			}
-			recentEvents.removeAll(toRemove);
+		}finally{
+			recentEventsLock.writeLock().unlock();
 		}
 		
 		userEventCache.purgeEventsBefore(time);
@@ -396,23 +435,31 @@ public class EventManager implements ILifecycle {
 	 * @return
 	 */
 	public int purgeEventsBefore(final long time, final String typeName){
-		List<EventInstance> toRemove = new ArrayList<EventInstance>();
-		for (EventInstance e : activeEvents) {
-			if((e.getActiveTimestamp() < time)&&(e.getEventType().getEventType().equals(typeName))){
-				toRemove.add(e);
+		
+		activeEventsLock.writeLock().lock();
+		try{
+			ListIterator<EventInstance> it = activeEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if((e.getActiveTimestamp() < time)&&(e.getEventType().getEventType().equals(typeName)))
+					it.remove();
 			}
+		}finally{
+			activeEventsLock.writeLock().unlock();
 		}
-		activeEvents.removeAll(toRemove);
-		toRemove.clear();
-		synchronized (recentEvents) {
-			for (EventInstance e : recentEvents) {
-				if((e.getActiveTimestamp() < time)&&(e.getEventType().getEventType().equals(typeName))){
-					toRemove.add(e);
-				}
+		
+		recentEventsLock.writeLock().lock();
+		try{
+			ListIterator<EventInstance> it = recentEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if((e.getActiveTimestamp() < time)&&(e.getEventType().getEventType().equals(typeName)))
+					it.remove();
 			}
-			recentEvents.removeAll(toRemove);
+		}finally{
+			recentEventsLock.writeLock().unlock();
 		}
-
+		
 		userEventCache.purgeEventsBefore(time, typeName);
 		
 		return eventDao.purgeEventsBefore(time, typeName);
@@ -425,20 +472,29 @@ public class EventManager implements ILifecycle {
 	 * @return
 	 */
 	public int purgeEventsBefore(final long time, final int alarmLevel){
-		List<EventInstance> toRemove = new ArrayList<EventInstance>();
-		for (EventInstance e : activeEvents) {
-			if((e.getActiveTimestamp() < time)&&(e.getAlarmLevel() == alarmLevel)){
-				toRemove.add(e);
+		
+		activeEventsLock.writeLock().lock();
+		try{
+			ListIterator<EventInstance> it = activeEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if((e.getActiveTimestamp() < time)&&(e.getAlarmLevel() == alarmLevel))
+					it.remove();
 			}
+		}finally{
+			activeEventsLock.writeLock().unlock();
 		}
-		activeEvents.removeAll(toRemove);
-		toRemove.clear();
-		synchronized (recentEvents) {
-			for (EventInstance e : recentEvents) {
-				if((e.getActiveTimestamp() < time)&&(e.getAlarmLevel() == alarmLevel)){
-					toRemove.add(e);
-				}
+		
+		recentEventsLock.writeLock().lock();
+		try{
+			ListIterator<EventInstance> it = recentEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if((e.getActiveTimestamp() < time)&&(e.getAlarmLevel() == alarmLevel))
+					it.remove();
 			}
+		}finally{
+			recentEventsLock.writeLock().unlock();
 		}
 
 		userEventCache.purgeEventsBefore(time, alarmLevel);
@@ -451,19 +507,34 @@ public class EventManager implements ILifecycle {
 	// Canceling events.
 	//
 	public void cancelEventsForDataPoint(int dataPointId) {
-		List<EventInstance> dataPointEvents = new ArrayList<EventInstance>();
-		for (EventInstance e : activeEvents) {
-			if (e.getEventType().getDataPointId() == dataPointId)
-				dataPointEvents.add(e);
-		}
 		
-		deactivateEvents(dataPointEvents, System.currentTimeMillis(), EventInstance.RtnCauses.SOURCE_DISABLED);
-		synchronized (recentEvents) {
-			for (int i = recentEvents.size() - 1; i >= 0; i--) {
-				EventInstance e = recentEvents.get(i);
-				if (e.getEventType().getDataPointId() == dataPointId)
-					recentEvents.remove(i);
+		List<EventInstance> dataPointEvents = new ArrayList<EventInstance>();
+		activeEventsLock.writeLock().lock();
+		try{
+			ListIterator<EventInstance> it = activeEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if (e.getEventType().getDataPointId() == dataPointId){
+					it.remove();
+					dataPointEvents.add(e);
+				}
 			}
+		}finally{
+			activeEventsLock.writeLock().unlock();
+		}
+
+		deactivateEvents(dataPointEvents, System.currentTimeMillis(), EventInstance.RtnCauses.SOURCE_DISABLED);
+
+		recentEventsLock.writeLock().lock();
+		try{
+			ListIterator<EventInstance> it = recentEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if (e.getEventType().getDataPointId() == dataPointId)
+					it.remove();
+			}
+		}finally{
+			recentEventsLock.writeLock().unlock();
 		}
 	}
 
@@ -472,19 +543,34 @@ public class EventManager implements ILifecycle {
 	 * @param dataSourceId
 	 */
 	public void cancelEventsForDataSource(int dataSourceId) {
+		
 		List<EventInstance> dataSourceEvents = new ArrayList<EventInstance>();
-		for (EventInstance e : activeEvents) {
-			if (e.getEventType().getDataSourceId() == dataSourceId)
-				dataSourceEvents.add(e);
+		activeEventsLock.writeLock().lock();
+		try{
+			ListIterator<EventInstance> it = activeEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if(e.getEventType().getDataSourceId() == dataSourceId){
+					it.remove();
+					dataSourceEvents.add(e);
+				}
+			}
+		}finally{
+			activeEventsLock.writeLock().unlock();
 		}
+
 		deactivateEvents(dataSourceEvents, System.currentTimeMillis(), EventInstance.RtnCauses.SOURCE_DISABLED);
 
-		synchronized (recentEvents) {
-			for (int i = recentEvents.size() - 1; i >= 0; i--) {
-				EventInstance e = recentEvents.get(i);
-				if (e.getEventType().getDataSourceId() == dataSourceId)
-					recentEvents.remove(i);
+		recentEventsLock.writeLock().lock();
+		try{
+			ListIterator<EventInstance> it = recentEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if(e.getEventType().getDataSourceId() == dataSourceId)
+					it.remove();
 			}
+		}finally{
+			recentEventsLock.writeLock().unlock();
 		}
 	}
 
@@ -493,28 +579,53 @@ public class EventManager implements ILifecycle {
 	 * @param publisherId
 	 */
 	public void cancelEventsForPublisher(int publisherId) {
+		
 		List<EventInstance> publisherEvents = new ArrayList<EventInstance>();
-		for (EventInstance e : activeEvents) {
-			if (e.getEventType().getPublisherId() == publisherId)
-				publisherEvents.add(e);
-				
-		}
-		deactivateEvents(publisherEvents, System.currentTimeMillis(), EventInstance.RtnCauses.SOURCE_DISABLED);
-		synchronized (recentEvents) {
-			for (int i = recentEvents.size() - 1; i >= 0; i--) {
-				EventInstance e = recentEvents.get(i);
-				if (e.getEventType().getPublisherId() == publisherId)
-					recentEvents.remove(i);
+		activeEventsLock.writeLock().lock();
+		try{
+			ListIterator<EventInstance> it = activeEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if(e.getEventType().getPublisherId() == publisherId){
+					it.remove();
+					publisherEvents.add(e);
+				}
 			}
+		}finally{
+			activeEventsLock.writeLock().unlock();
+		}
+		
+		deactivateEvents(publisherEvents, System.currentTimeMillis(), EventInstance.RtnCauses.SOURCE_DISABLED);
+
+		recentEventsLock.writeLock().lock();
+		try{
+			ListIterator<EventInstance> it = recentEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if(e.getEventType().getPublisherId() == publisherId)
+					it.remove();
+			}
+		}finally{
+			recentEventsLock.writeLock().unlock();
 		}
 	}
 
 	private void resetHighestAlarmLevel(long time) {
+		
 		int max = 0;
-		for (EventInstance e : activeEvents) {
-			if (e.getAlarmLevel() > max)
-				max = e.getAlarmLevel();
+		activeEventsLock.readLock().lock();
+		try{
+			ListIterator<EventInstance> it = activeEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if (e.getAlarmLevel() > max)
+					max = e.getAlarmLevel();
+			}
+		}finally{
+			activeEventsLock.readLock().unlock();
 		}
+		
+		
 
 		if (max > highestActiveAlarmLevel) {
 			int oldValue = highestActiveAlarmLevel;
@@ -556,7 +667,13 @@ public class EventManager implements ILifecycle {
 		userDao = new UserDao();
 
 		// Get all active events from the database.
-		activeEvents.addAll(eventDao.getActiveEvents());
+		activeEventsLock.writeLock().lock();
+		try{
+			activeEvents.addAll(eventDao.getActiveEvents());
+		}finally{
+			activeEventsLock.writeLock().unlock();
+		}
+		
 		lastAlarmTimestamp = System.currentTimeMillis();
 		resetHighestAlarmLevel(lastAlarmTimestamp);
 	}
@@ -606,18 +723,32 @@ public class EventManager implements ILifecycle {
 	 * none.
 	 */
 	private EventInstance get(EventType type) {
-		for (EventInstance e : activeEvents) {
-			if (e.getEventType().equals(type))
-				return e;
+		
+		activeEventsLock.readLock().lock();
+		try{
+			ListIterator<EventInstance> it = activeEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if (e.getEventType().equals(type))
+					return e;
+			}
+		}finally{
+			activeEventsLock.readLock().unlock();
 		}
+		
 		return null;
 	}
 
 	private List<EventInstance> getAll(EventType type) {
 		List<EventInstance> result = new ArrayList<EventInstance>();
-		for (EventInstance e : activeEvents) {
-			if (e.getEventType().equals(type))
-				result.add(e);
+		activeEventsLock.readLock().lock();
+		try{
+			ListIterator<EventInstance> it = activeEvents.listIterator();
+			while(it.hasNext()){
+				result.add(it.next());
+			}
+		}finally{
+			activeEventsLock.readLock().unlock();
 		}
 		return result;
 	}
@@ -629,8 +760,14 @@ public class EventManager implements ILifecycle {
 	 */
 	public List<EventInstance> getAllActive() {
 		List<EventInstance> result = new ArrayList<EventInstance>();
-		for (EventInstance e : activeEvents) {
-				result.add(e);
+		activeEventsLock.readLock().lock();
+		try{
+			ListIterator<EventInstance> it = activeEvents.listIterator();
+			while(it.hasNext()){
+				result.add(it.next());
+			}
+		}finally{
+			activeEventsLock.readLock().unlock();
 		}
 		return result;
 	}
@@ -643,12 +780,20 @@ public class EventManager implements ILifecycle {
 	 * @return
 	 */
 	private EventInstance remove(EventType type) {
-		for (EventInstance e : activeEvents) {
-			if (e.getEventType().equals(type)) {
-				activeEvents.remove(e);
-				return e;
+		activeEventsLock.writeLock().lock();
+		try{
+			ListIterator<EventInstance> it = activeEvents.listIterator();
+			while(it.hasNext()){
+				EventInstance e = it.next();
+				if (e.getEventType().equals(type)) {
+					it.remove();
+					return e;
+				}
 			}
+		}finally{
+			activeEventsLock.writeLock().unlock();
 		}
+
 		return null;
 	}
 

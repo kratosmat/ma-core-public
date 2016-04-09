@@ -10,6 +10,8 @@
  <property name="modules.public.path" value="../.." />
  <property name="modules.private.path" value="../.." />
  <property name="modules.proprietary.path" value="../.." />
+ <property name="modules.dashboards.path" value="../.." />
+ 
  
 
  <!-- 
@@ -19,6 +21,7 @@
     - the ${modules.public.path} set to where the public modules are located
     - the ${modules.private.path} set to where the private modules are located
     - the ${modules.proprietary.path} set to where the proprietary modules are located
+    - the ${modules.dashboards.path} set to where the dashboard modules are located
     - the ${core.deploy.path} set to where the core release hierarchy should begin
   -->
  <target name="release-full" description="Deploy Release with specified public modules into ${deploy.core.paths}/${core-version}" >
@@ -42,9 +45,14 @@
         <fileset dir="${coreHome}" includes="build.xml"/>
     </subant>
 
+    <!-- Create a zip of the core without modules -->
+    <subant target="public-release">
+        <property name="core.deploy.paths" value="${core.deploy.path}/${maven-pom.version}/" />
+        <fileset dir="${coreHome}" includes="build.xml"/>
+    </subant>
 
     <!-- Compile the default core public modules into the core -->
-   	<property name="public-modules" value="ASCII File Data Source,Graphical views,Internal Data Source,JSP Views,Log4J reset,Maintenance Events,Point Data Import,PointLinks,Reports,Scheduled Events,Serial Data Source,SQL console,SST Graphics,SST Theme,Virtual Data Source,VMStat data source,Watchlist"/>
+   	<property name="public-modules" value="ASCII File Data Source,Graphical views,Internal Data Source,JSP Views,Log4J reset,Maintenance Events,Mango API,Point Data Import,PointLinks,Reports,Scheduled Events,Serial Data Source,SQL console,SST Graphics,SST Theme,Virtual Data Source,VMStat data source,Watchlist"/>
     
     <for list="${public-modules}" param="moduleName" delimiter=",">
         <sequential>
@@ -56,7 +64,7 @@
     </for>
     
     <!-- Compile the default core private modules into the core -->
-    <property name="private-modules" value="BACnet,ControlCore,Custom Dashboards,Data File Data Source,DGLux,DNP3,Galil Data Source,HTTP,JMX Data Source,Log4jDataSource,LoggingConsole,Mango API,MBus,Meta Data Source,Modbus,OneWire,OPC DA,OpenV,Pachube,Persistent TCP,POP3,Scripting,SNMP,SQL Data Source,SSHDataSource,SST Global Scripts,TCPIP Data Source,TemplateConfiguration,Twilio,Zwave"/>
+    <property name="private-modules" value="BACnet,ControlCore,Data File Data Source,DGLux,DNP3,Galil Data Source,HTTP,JMX Data Source,Log4jDataSource,LoggingConsole,MBus,Meta Data Source,Modbus,OneWire,OPC DA,OpenV,Pachube,Persistent TCP,POP3,Scripting,SNMP,SQL Data Source,SSHDataSource,SST Global Scripts,TCPIP Data Source,TemplateConfiguration,Twilio,Zwave"/>
 
     <for list="${private-modules}" param="moduleName" delimiter=",">
         <sequential>
@@ -69,7 +77,7 @@
 
 
     <!-- Compile the default Proprietary modules into the core -->
-    <property name="proprietary-modules" value="MangoNoSql,DataPointDetailsView,eGauge Data Source,Excel Reports"/>
+    <property name="proprietary-modules" value="MangoNoSql,DataPointDetailsView,eGauge Data Source,Excel Reports,PakBus"/>
 
     <for list="${proprietary-modules}" param="moduleName" delimiter=",">
         <sequential>
@@ -81,9 +89,22 @@
     </for>
 
 
+    <!-- Compile the custom dashboards module into the core -->
+    <property name="ma-dashboards" value="Custom Dashboards"/>
 
+    <for list="${ma-dashboards}" param="moduleName" delimiter=",">
+        <sequential>
+            <subant target="deploy">
+                <property name="core.target" value="${core.target}"/>
+                <fileset dir="${modules.dashboards.path}/@{moduleName}" includes="build.xml"/>
+            </subant>
+        </sequential>
+    </for>
+
+    <!-- Create a Zip of the Core with base modules -->
     <subant target="public-release">
         <property name="core.deploy.paths" value="${core.deploy.path}/${maven-pom.version}/" />
+        <property name="fullName" value="m2m2-fullCore-${maven-pom.version}" />
         <fileset dir="${coreHome}" includes="build.xml"/>
     </subant>
 
@@ -104,7 +125,11 @@
         <property name="modules.deploy.path" value="${core.deploy.path}/${maven-pom.version}/"/>
         <fileset dir="${modules.proprietary.path}" includes="build.xml"/>
     </subant>
-
+    <subant target="deploy-all-somewhere">
+        <property name="core.target" value="${core.target}" />
+        <property name="modules.deploy.path" value="${core.deploy.path}/${maven-pom.version}/"/>
+        <fileset dir="${modules.dashboards.path}" includes="build.xml"/>
+    </subant>
 
 </target>
 

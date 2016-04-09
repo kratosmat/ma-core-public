@@ -13,6 +13,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
@@ -48,6 +49,10 @@ public class RestSecurityConfiguration extends WebSecurityConfigurerAdapter {
 		return new MangoUserAuthenticationProvider();
 	}
 
+	public AccessDeniedHandler accessDeniedHandler(){
+		return new MangoAccessDeniedHandler();
+	}
+	
 	@Override
 	protected void configure(HttpSecurity http) throws Exception {
 		
@@ -55,21 +60,27 @@ public class RestSecurityConfiguration extends WebSecurityConfigurerAdapter {
 			//We are letting the legacy permissions system handle these pages for now
 			.antMatchers(HttpMethod.GET, "/**/*.shtm").permitAll()
 			.antMatchers(HttpMethod.POST, "/**/*.shtm").permitAll()
+			.antMatchers(HttpMethod.GET, "/*.shtm").permitAll()
 			
 			//Allow all access for legacy login
 			.antMatchers(HttpMethod.GET, "/login*").permitAll() 
 			.antMatchers(HttpMethod.POST, "/login*").permitAll()
+			
 			
 			//Allow Startup REST Endpoint
 			.antMatchers(HttpMethod.GET, "/status**").permitAll()
 			
 			//REST api Restrictions
 			.antMatchers(HttpMethod.GET, "/rest/v1/login/*").permitAll()
+			.antMatchers(HttpMethod.OPTIONS, "/rest/v1/login/*").permitAll() //For CORS reqeusts
+			.antMatchers(HttpMethod.GET, "/rest/v1/translations/public/*").permitAll() //For public translations
+			.antMatchers(HttpMethod.OPTIONS, "/rest/v1/translations/public/*").permitAll() //For public translations
+			.antMatchers(HttpMethod.OPTIONS, "/rest/v1/**").authenticated()
 			.antMatchers(HttpMethod.POST, "/rest/v1/**").authenticated()
 			.antMatchers(HttpMethod.PUT, "/rest/v1/**").authenticated()
 			.antMatchers(HttpMethod.DELETE, "/rest/v1/**").authenticated()
 			.antMatchers(HttpMethod.GET, "/rest/v1/**").authenticated(); //Since we are currently checking credentials in the REST Code we can use this for now
-
+			
 		//CSRF Headers https://spring.io/blog/2015/01/12/the-login-page-angular-js-and-spring-security-part-ii
 		http.authorizeRequests().anyRequest().authenticated().and().addFilterAfter(new CsrfHeaderFilter(), CsrfFilter.class)
 			.csrf().csrfTokenRepository(csrfTokenRepository());
@@ -89,6 +100,11 @@ public class RestSecurityConfiguration extends WebSecurityConfigurerAdapter {
 //		.logoutSuccessHandler(logoutSuccessHandler)
 //		.addLogoutHandler(logoutHandler)
 		
+		//Exception Handling
+		http.exceptionHandling().accessDeniedHandler(accessDeniedHandler());
+		
+		//Customize the headers here
+		http.headers().frameOptions().sameOrigin();
 	}
 	
 	private CsrfTokenRepository csrfTokenRepository() {

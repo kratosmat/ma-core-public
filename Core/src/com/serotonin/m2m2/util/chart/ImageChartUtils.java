@@ -26,7 +26,6 @@ import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.AbstractRenderer;
 import org.jfree.chart.renderer.xy.AbstractXYItemRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
-import org.jfree.chart.renderer.xy.XYSplineRenderer;
 import org.jfree.chart.renderer.xy.XYStepRenderer;
 import org.jfree.data.general.SeriesException;
 import org.jfree.data.time.Millisecond;
@@ -95,9 +94,12 @@ public class ImageChartUtils {
                 else if (nts.getPlotType() == DataPointVO.PlotTypes.LINE)
                     renderer = new XYLineAndShapeRenderer(true, false);
                 else {
-                    XYSplineRenderer spline = new XYSplineRenderer();
-                    spline.setBaseShapesVisible(false);
-                    renderer = spline;
+                	//XYCardinalSplineRenderer spline = new XYCardinalSplineRenderer(.5d, 16);
+                	//XYSmoothLineAndShapeRenderer spline = new XYSmoothLineAndShapeRenderer();
+                	//XYSplineRenderer spline = new XYSplineRenderer();
+                    //spline.setBaseShapesVisible(false);
+                    //renderer = spline;
+                	renderer = new XYLineAndShapeRenderer(true, false);
                 }
 
                 if (nts.getPaint() != null)

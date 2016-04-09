@@ -70,7 +70,12 @@ GridAndEditor.prototype.closeEditor = function() {
 GridAndEditor.buttonDisabled = function(object, user, permission) {
     if (user) {
         var isOwner = object.username === user.username;
-        var hasPermission = permission && user.hasPermission(permission);
+        var hasPermission = false;
+        
+        if(typeof permission !== 'undefined')
+        	hasPermission = user.hasPermission(permission);
+        else
+        	hasPermission = user.admin;
         
         if (!(isOwner || hasPermission)) {
             return true;

@@ -147,6 +147,11 @@
            $set("<c:out value="<%= SystemSettingsDao.MED_PRI_CORE_POOL_SIZE %>"/>", settings.<c:out value="<%= SystemSettingsDao.MED_PRI_CORE_POOL_SIZE %>"/>);                
            $set("<c:out value="<%= SystemSettingsDao.LOW_PRI_CORE_POOL_SIZE %>"/>", settings.<c:out value="<%= SystemSettingsDao.LOW_PRI_CORE_POOL_SIZE %>"/>);                
 
+           //Site Analytics
+           $set("<c:out value="<%= SystemSettingsDao.SITE_ANALYTICS_HEAD %>"/>", settings.<c:out value="<%= SystemSettingsDao.SITE_ANALYTICS_HEAD %>"/>);                
+           $set("<c:out value="<%= SystemSettingsDao.SITE_ANALYTICS_BODY %>"/>", settings.<c:out value="<%= SystemSettingsDao.SITE_ANALYTICS_BODY %>"/>);                
+           
+           
            displayVirtualSerialPorts(settings.virtualSerialPorts)
             
             //
@@ -265,6 +270,9 @@
     }
     
     function saveEmailSettings() {
+        setUserMessage("emailMessage");
+        setDisabled("saveEmailSettingsBtn", true);
+        hideContextualMessages("emailSettingsTab")
         SystemSettingsDwr.saveEmailSettings(
             $get("<c:out value="<%= SystemSettingsDao.EMAIL_SMTP_HOST %>"/>"),
             $get("<c:out value="<%= SystemSettingsDao.EMAIL_SMTP_PORT %>"/>"),
@@ -275,12 +283,15 @@
             $get("<c:out value="<%= SystemSettingsDao.EMAIL_SMTP_PASSWORD %>"/>"),
             $get("<c:out value="<%= SystemSettingsDao.EMAIL_TLS %>"/>"),
             $get("<c:out value="<%= SystemSettingsDao.EMAIL_CONTENT_TYPE %>"/>"),
-            function() {
-                setDisabled("saveEmailSettingsBtn", false);
-                setUserMessage("emailMessage", "<fmt:message key="systemSettings.emailSettingsSaved"/>");
+            function(response) {
+            	setDisabled("saveEmailSettingsBtn", false);
+            	if(response.hasMessages){
+            		showDwrMessages(response.messages);
+            	}else{
+            		setUserMessage("emailMessage", "<fmt:message key="systemSettings.emailSettingsSaved"/>");
+            	}
             });
-        setUserMessage("emailMessage");
-        setDisabled("saveEmailSettingsBtn", true);
+
     }
     
     function sendTestEmail() {
@@ -320,6 +331,24 @@
             });
         setUserMessage("threadPoolMessage");
         setDisabled("saveThreadPoolSettingsBtn", true);
+    }
+    
+    function saveSiteAnalytics() {
+        setUserMessage("siteAnalyticsMessages");
+        setDisabled("siteAnalyticsBtn", true);
+        hideContextualMessages("siteAnalyticsTab")
+        SystemSettingsDwr.saveSiteAnalytics(
+            $get("<c:out value="<%= SystemSettingsDao.SITE_ANALYTICS_HEAD %>"/>"),
+            $get("<c:out value="<%= SystemSettingsDao.SITE_ANALYTICS_BODY %>"/>"),
+            function(response) {
+            	setDisabled("siteAnalyticsBtn", false);
+            	if(response.hasMessages){
+            		showDwrMessages(response.messages);
+            	}else{
+            		setUserMessage("siteAnalyticsMessages", "<fmt:message key="systemSettings.siteAnalytics.saved"/>");
+            	}
+            });
+
     }
     
     function updateAlarmLevel(eventType, eventSubtype, alarmLevel) {
@@ -823,10 +852,36 @@
     </table>
   </tag:labelledSection>
   
+  <tag:labelledSection labelKey="systemSettings.siteAnalytics" closed="true">
+    <table id="siteAnalyticsTab">
+      <tr>
+        <td class="formLabel"><fmt:message key="systemSettings.siteAnalytics.headTag"/></td>
+        <td class="formField">
+          <textarea id="<c:out value="<%= SystemSettingsDao.SITE_ANALYTICS_HEAD %>"/>" cols="100" rows="5">
+          </textarea>
+        </td>
+      </tr>
+      <tr>
+        <td class="formLabel"><fmt:message key="systemSettings.siteAnalytics.bodyTag"/></td>
+        <td class="formField">
+          <textarea id="<c:out value="<%= SystemSettingsDao.SITE_ANALYTICS_BODY %>"/>" cols="100" rows="5">
+          </textarea>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" align="center">
+          <input id="siteAnalyticsTestBtn" type="button" value="<fmt:message key='common.test'/>" onclick="window.open('/data_point_details.shtm');"/>
+          <input id="siteAnalyticsBtn" type="button" value="<fmt:message key="common.save"/>" onclick="saveSiteAnalytics()"/>
+          <tag:help id="siteAnalyticsSettings"/>
+        </td>
+      </tr>
+      <tr><td colspan="2" id="siteAnalyticsMessages" class="formError"></td></tr>
+    </table>
+  </tag:labelledSection>
   
   <tag:labelledSection labelKey="systemSettings.comm.virtual.serialPorts" closed="true">
   <table><tbody id="virtualSerialPortGenericMessages"></tbody></table>
-  <div class="borderDiv marR" style="widthxx: 250px; float: left;">
+  <div class="borderDiv marR" style="width: 250px; float: left;">
     <table>
       <tr>
         <td>
@@ -963,7 +1018,7 @@
   </c:if>
   
   <tag:labelledSection labelKey="systemSettings.emailSettings" closed="true">
-    <table>
+    <table id="emailSettingsTab">
       <tr>
         <td class="formLabelRequired"><fmt:message key="systemSettings.smtpHost"/></td>
         <td class="formField"><input id="<c:out value="<%= SystemSettingsDao.EMAIL_SMTP_HOST %>"/>" type="text"/></td>
@@ -1097,7 +1152,8 @@
   <tag:labelledSection labelKey="systemSettings.uiPerformance" closed="true">
       <table>
       <tr>
-        <td class="formLabelRequired"><fmt:message key="systemSettings.uiPerformance"/></td>
+        <td class="formLabelRequired"><fmt:message key="systemSettings.uiPerformance"/>
+        <tag:help id="uiPerformance"/></td>
         <td class="formField">
           <select id="<c:out value="<%= SystemSettingsDao.UI_PERFORMANCE %>"/>">
             <option value="2000"><fmt:message key="systemSettings.uiPerformance.high"/></option>

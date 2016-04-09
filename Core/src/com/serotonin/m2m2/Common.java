@@ -66,6 +66,7 @@ import com.serotonin.m2m2.web.comparators.StringStringPairComparator;
 import com.serotonin.m2m2.web.filter.LoggedInFilter;
 import com.serotonin.monitor.MonitoredValues;
 import com.serotonin.timer.CronTimerTrigger;
+import com.serotonin.timer.OrderedRealTimeTimer;
 import com.serotonin.timer.RealTimeTimer;
 import com.serotonin.util.StringUtils;
 import com.serotonin.util.properties.ReloadingProperties;
@@ -110,7 +111,7 @@ public class Common {
     public static final List<ImageSet> imageSets = new ArrayList<ImageSet>();
     public static final List<DynamicImage> dynamicImages = new ArrayList<DynamicImage>();
 
-    public static final RealTimeTimer timer = new RealTimeTimer();
+    public static final RealTimeTimer timer = new OrderedRealTimeTimer();
     public static final MonitoredValues MONITORED_VALUES = new MonitoredValues();
     public static final JsonContext JSON_CONTEXT = new JsonContext();
 
@@ -148,11 +149,11 @@ public class Common {
     }
 
     public static final int getMicroVersion() {
-        return 1;
+        return 10;
     }
 
     public static final int getDatabaseSchemaVersion() {
-        return 11;
+        return 12;
     }
 
     /**
